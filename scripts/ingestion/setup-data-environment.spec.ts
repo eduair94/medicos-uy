@@ -30,6 +30,8 @@ describe('createDataEnvironment', () => {
 
     expect(content).toContain(`MSP_LINKAGE_HMAC_KEY=${'synthetic-secret-'.repeat(4)}`);
     expect(content).toContain('MSP_ALLOW_INSECURE_TLS=false');
+    expect(content).toContain('DATA_INGESTION_DIR=data');
+    expect(content).toContain('INGESTION_DATA_DIR=data');
   });
 
   it('refuses to overwrite an existing secret file', async () => {

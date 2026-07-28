@@ -115,8 +115,9 @@ titulares se reducen a un contador sin detalles. La salida nunca contiene IDs pr
 `articles.ndjson` no conserva cuerpo ni descripción, queda bajo `data/normalized/`, no es publicable
 y tiene un TTL máximo de 90 días registrado en `manifest.json`.
 
-`data:link:news-candidates` no recolecta noticias: exige un `articles.ndjson` normalizado y su
-manifiesto verificable; rechaza hashes, conteos o TTL vencidos y sólo produce hipótesis nominales
+`data:link:news-candidates` no recolecta noticias: usa el `articles.ndjson` normalizado más reciente
+dentro de `DATA_INGESTION_DIR`, o el lote exacto indicado por `NEWS_ARTICLES_PATH`, y exige su
+manifiesto verificable. Rechaza hashes, conteos o TTL vencidos y sólo produce hipótesis nominales
 internas con estado `NEEDS_HUMAN_REVIEW`. El contrato de entrada, las reglas conservadoras de
 matching y las salvaguardas de cuarentena están documentados en
 [`scripts/ingestion/news/README.md`](../scripts/ingestion/news/README.md). Su salida no alimenta la
@@ -353,3 +354,30 @@ demuestra por qué Crawl4AI debe ser un transporte opcional, no la única fuente
 - expiración visible de horarios que no pudieron revalidarse;
 - canal de acceso y rectificación con plazo máximo de cinco días hábiles, suspensión visible
   mientras se investiga una impugnación y notificación de la corrección a destinatarios.
+
+## Dossier privado por profesional
+
+`data:research:professional -- --name "<nombre>"` proyecta en un solo artefacto privado el registro
+MSP, candidatos institucionales, filas exactas de horarios, menciones web y referencias públicas
+curadas. La proyección no modifica PostgreSQL ni el export público.
+
+Las URLs completas pueden entregarse por una API personal autenticada. La marca
+`publicExportAllowed: false` separa esa consulta privada del directorio público; no elimina los
+vínculos del reporte interno.
+
+La proyección sigue exclusivamente los `recordId` emitidos por parsers institucionales. Nunca
+considera como evidencia una aparición del nombre dentro del selector general de una agenda.
+LinkedIn se admite sólo como URL curada sin descarga automatizada; documentos que no contienen el
+nombre se conectan únicamente como corroboración contextual de otra referencia nominada. El
+contrato, variables y comando están en `scripts/ingestion/research/README.md`.
+
+## Cobertura web para todos los perfiles
+
+`data:enrich:web:tick` recorre fuentes expresamente habilitadas una vez y compara su contenido
+benigno contra todo el padrón MSP. Produce una fila de `coverage.ndjson` por perfil, aun cuando no
+haya candidato. El estado `NO_CANDIDATE_WITHIN_CONFIGURED_SCOPE` sólo describe las fuentes y el
+momento de esa ejecución; no prueba ausencia de información.
+
+Toda mención queda en cuarentena con `NOT_LINKED` y `NOT_PUBLISHED`. El clasificador descarta
+contenido adverso, judicial, de menores o de salud privada antes de extraer nombres. Consulte
+`scripts/ingestion/web/README.md` para la política, variables y límites.

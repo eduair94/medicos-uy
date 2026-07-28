@@ -63,10 +63,12 @@ artículo como hechos, no vincula registros y no produce una salida publicable.
 No admite número de documento, cédula, correo ni teléfono. Si la variable queda vacía, se
 selecciona el último `professionals.ndjson` MSP dentro de `DATA_INGESTION_DIR`.
 
-`NEWS_ARTICLES_PATH` es obligatorio y debe estar acompañado por su `manifest.json` (o por
-`NEWS_ARTICLES_MANIFEST_PATH`). Antes del matching se verifican path, SHA-256, cantidad de registros,
-TTL y vencimiento; un lote vencido no puede recibir un TTL nuevo. Cada línea de `articles.ndjson`
-debe cumplir exactamente este contrato:
+Si `NEWS_ARTICLES_PATH` queda vacío, se selecciona el lote con `generatedAt` más reciente dentro de
+`DATA_INGESTION_DIR/normalized/news/`. También puede fijarse un lote exacto con
+`NEWS_ARTICLES_PATH`, acompañado por su `manifest.json` o por `NEWS_ARTICLES_MANIFEST_PATH`. Antes
+del matching se verifican path, SHA-256, cantidad de registros, TTL y vencimiento; un lote vencido
+no puede recibir un TTL nuevo. Cada línea de `articles.ndjson` debe cumplir exactamente este
+contrato:
 
 ```json
 {
@@ -159,9 +161,11 @@ El `candidateId` es determinista y deriva únicamente del `linkageId` opaco del 
 
 ```powershell
 $env:DATA_INGESTION_DIR='data'
-$env:NEWS_ARTICLES_PATH='data/normalized/news/articles.ndjson'
 pnpm.cmd data:link:news-candidates
 ```
+
+Para reprocesar un snapshot específico, defina además
+`NEWS_ARTICLES_PATH='data/normalized/news/<artifactId>/articles.ndjson'`.
 
 La salida predeterminada es:
 

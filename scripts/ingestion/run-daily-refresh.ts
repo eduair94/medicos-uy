@@ -28,7 +28,13 @@ export interface DailyRefreshStage {
 export interface DailyRefreshPlanOptions {
   readonly mutualistas?: readonly MutualistaStageName[];
   readonly newsEnabled?: boolean;
+  readonly webEnrichmentEnabled?: boolean;
   readonly publicExportEnabled?: boolean;
+}
+
+export interface PackageScriptCommand {
+  readonly executable: string;
+  readonly arguments: readonly string[];
 }
 
 interface StageExecution {
@@ -112,7 +118,7 @@ export function buildDailyRefreshPlan(
   const stages: DailyRefreshStage[] = [
     {
       name: 'prepare-data-directories',
-      packageScript: 'data:setup',
+      packageScript: 'data:prepare',
       publicationBoundary: 'LOCAL_MAINTENANCE',
     },
     {
@@ -133,25 +139,39 @@ export function buildDailyRefreshPlan(
   ];
 
   if (options.newsEnabled ?? true) {
+    stages.push(
+      {
+        name: 'ingest-authorized-news-indexes',
+        packageScript: 'data:ingest:news-indexes',
+        publicationBoundary: 'INTERNAL_INGESTION',
+      },
+      {
+        name: 'build-news-linkage-candidates',
+        packageScript: 'data:link:news-candidates',
+        publicationBoundary: 'INTERNAL_LINKAGE',
+      },
+    );
+  }
+
+  stages.push({
+    name: 'build-linkage-candidates',
+    packageScript: 'data:link:candidates',
+    publicationBoundary: 'INTERNAL_LINKAGE',
+  });
+
+  if (options.webEnrichmentEnabled ?? false) {
     stages.push({
-      name: 'ingest-authorized-news-indexes',
-      packageScript: 'data:ingest:news-indexes',
-      publicationBoundary: 'INTERNAL_INGESTION',
+      name: 'enrich-approved-web-sources',
+      packageScript: 'data:enrich:web:tick',
+      publicationBoundary: 'INTERNAL_LINKAGE',
     });
   }
 
-  stages.push(
-    {
-      name: 'build-linkage-candidates',
-      packageScript: 'data:link:candidates',
-      publicationBoundary: 'INTERNAL_LINKAGE',
-    },
-    {
-      name: 'build-internal-directory-snapshot',
-      packageScript: 'data:build:directory',
-      publicationBoundary: 'INTERNAL_DIRECTORY',
-    },
-  );
+  stages.push({
+    name: 'build-internal-directory-snapshot',
+    packageScript: 'data:build:directory',
+    publicationBoundary: 'INTERNAL_DIRECTORY',
+  });
 
   if (options.publicExportEnabled ?? false) {
     stages.push({
@@ -195,14 +215,44 @@ async function persistStatus(path: string, status: DailyRefreshStatus): Promise<
   });
 }
 
+export function resolvePackageScriptCommand(
+  packageScript: string,
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+): PackageScriptCommand {
+  const packageManagerCli = environment['npm_execpath']?.trim();
+  if (packageManagerCli !== undefined && packageManagerCli.length > 0) {
+    return {
+      executable: process.execPath,
+      arguments: [packageManagerCli, 'run', packageScript],
+    };
+  }
+
+  if (platform === 'win32') {
+    const configuredCommandInterpreter = environment['ComSpec']?.trim();
+    return {
+      executable:
+        configuredCommandInterpreter === undefined || configuredCommandInterpreter.length === 0
+          ? 'cmd.exe'
+          : configuredCommandInterpreter,
+      arguments: ['/d', '/s', '/c', `pnpm.cmd run ${packageScript}`],
+    };
+  }
+
+  return {
+    executable: 'pnpm',
+    arguments: ['run', packageScript],
+  };
+}
+
 async function runPackageScript(
   packageScript: string,
   environment: NodeJS.ProcessEnv,
 ): Promise<number> {
-  const executable = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+  const command = resolvePackageScriptCommand(packageScript, environment);
 
   return new Promise<number>((fulfill, reject) => {
-    const child = spawn(executable, ['run', packageScript], {
+    const child = spawn(command.executable, command.arguments, {
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -232,6 +282,11 @@ export async function runDailyRefresh(environment: NodeJS.ProcessEnv = process.e
       environment['DAILY_REFRESH_NEWS_ENABLED'],
       true,
       'DAILY_REFRESH_NEWS_ENABLED',
+    ),
+    webEnrichmentEnabled: parseBoolean(
+      environment['DAILY_REFRESH_WEB_ENRICHMENT_ENABLED'],
+      false,
+      'DAILY_REFRESH_WEB_ENRICHMENT_ENABLED',
     ),
     publicExportEnabled: parseBoolean(
       environment['DAILY_REFRESH_PUBLIC_EXPORT_ENABLED'],

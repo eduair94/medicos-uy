@@ -21,7 +21,9 @@ export async function createDataEnvironment(options: DataEnvironmentOptions = {}
     '# Generated locally. This file is ignored by Git; move the secret to a secret manager in production.',
     `MSP_LINKAGE_HMAC_KEY=${secret}`,
     'MSP_ALLOW_INSECURE_TLS=false',
+    'DATA_INGESTION_DIR=data',
     'MSP_INGESTION_DATA_DIR=data',
+    'INGESTION_DATA_DIR=data',
     `MSP_INFOTITULOS_URL=${DEFAULT_INFOTITULOS_URL}`,
     '',
   ].join('\n');

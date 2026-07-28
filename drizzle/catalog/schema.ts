@@ -29,3 +29,8 @@ export {
   publicProfessionalRouteView,
   publicProfessionalView,
 } from '../../packages/modules/professionals/src/infrastructure/persistence/drizzle/professional.schema';
+export {
+  privateDirectorySnapshotTable,
+  privateIngestionSchema,
+  privateProfessionalProfileTable,
+} from '../ingestion-private/schema';

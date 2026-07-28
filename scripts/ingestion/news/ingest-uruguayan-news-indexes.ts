@@ -1914,6 +1914,7 @@ export async function runUruguayanNewsIndexIngestion(
       NEWS_HEADLINE_POLICY_VERSION,
       NEWS_SOURCE_RIGHTS_POLICY_VERSION,
       professionalArtifact.sha256,
+      generatedAt,
       articleContent,
       JSON.stringify(
         collection.sources.map(

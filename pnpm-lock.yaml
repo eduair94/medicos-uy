@@ -167,6 +167,9 @@ importers:
       '@eslint/js':
         specifier: 'catalog:'
         version: 10.0.1(eslint@10.8.0(supports-color@10.2.2))
+      '@medicos/discovery':
+        specifier: workspace:*
+        version: link:packages/modules/discovery
       '@medicos/http':
         specifier: workspace:*
         version: link:packages/platform/http
@@ -399,6 +402,8 @@ importers:
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
+
+  packages/modules/discovery: {}
 
   packages/modules/professionals:
     dependencies:

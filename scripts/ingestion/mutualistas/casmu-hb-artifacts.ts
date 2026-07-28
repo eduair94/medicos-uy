@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { configuredDataDirectory } from '../prepare-data-directories';
+
 export const PUBLIC_DATA_SCHEMA_VERSION = '1.0.0';
 
 export interface ProviderRunPaths {
@@ -85,10 +87,7 @@ export function createProviderRunPaths(
   runId: string,
   configuredDataRoot?: string,
 ): ProviderRunPaths {
-  const dataRoot = path.resolve(
-    process.cwd(),
-    configuredDataRoot ?? process.env['INGESTION_DATA_DIR'] ?? 'data',
-  );
+  const dataRoot = path.resolve(process.cwd(), configuredDataRoot ?? configuredDataDirectory());
 
   return {
     dataRoot,

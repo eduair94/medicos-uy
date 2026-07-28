@@ -12,8 +12,9 @@ coincidencias.
 4. ejecuta los adaptadores habilitados de CASMU, Asociación Española, SMI, Médica Uruguaya y
    Hospital Británico;
 5. lee únicamente índices de noticias autorizados;
-6. genera candidatos de vinculación en cuarentena;
-7. construye un snapshot factual interno.
+6. genera candidatos de noticias en cuarentena a partir del lote recién recolectado;
+7. genera candidatos de vinculación institucional;
+8. construye un snapshot factual interno.
 
 El plan puede inspeccionarse sin red ni escritura:
 
@@ -48,6 +49,7 @@ y complete los secretos fuera del repositorio.
 | ------------------------------------- | ----------- | ----------------------------------------- |
 | `DATA_INGESTION_DIR`                  | `data`      | raíz común de artefactos                  |
 | `MSP_LINKAGE_HMAC_KEY`                | sin default | seudonimización interna del documento MSP |
+| `NODE_EXTRA_CA_CERTS`                 | del sistema | CA adicional oficial si el host la omite  |
 | `DAILY_REFRESH_MUTUALISTAS`           | todas       | allowlist CSV de adaptadores              |
 | `DAILY_REFRESH_NEWS_ENABLED`          | `true`      | habilita índices con política vigente     |
 | `DAILY_REFRESH_PUBLIC_EXPORT_ENABLED` | `false`     | agrega el exportador firmado              |
@@ -55,6 +57,11 @@ y complete los secretos fuera del repositorio.
 
 Los booleanos deben ser explícitos (`true/false`, `1/0`, `yes/no`, `on/off`). Un nombre de
 mutualista desconocido aborta antes de descargar.
+
+No use `MSP_ALLOW_INSECURE_TLS=true` para resolver una cadena incompleta. Instale la CA oficial en
+el almacén del sistema o configure `NODE_EXTRA_CA_CERTS` con un archivo verificado, de propiedad de
+root y no escribible por el usuario del servicio. La variable debe existir antes de iniciar cada
+proceso Node; el orquestador diario la hereda a todas las etapas.
 
 ## Estado y observabilidad
 
@@ -154,3 +161,17 @@ sudo -u medicos /usr/local/sbin/medicos-daily-refresh
 No se recomienda GitHub Actions para este cron: obligaría a trasladar secretos y potenciales datos
 personales a runners externos o abrir PostgreSQL a rangos cambiantes. GitHub Actions se limita a CI
 con fixtures sintéticos.
+
+## Enriquecimiento web opcional
+
+Mantenga `DAILY_REFRESH_WEB_ENRICHMENT_ENABLED=false` hasta instalar fuera del repositorio una
+política vigente en `WEB_ENRICHMENT_SOURCE_POLICY_PATH`. Antes de habilitar el cron:
+
+```bash
+sudo -u medicos pnpm data:enrich:web:plan
+sudo -u medicos pnpm data:enrich:web:tick
+```
+
+Compruebe que el manifiesto declara `publicExportAllowed=false`, que `coverage.ndjson` tiene una
+fila por perfil MSP y que una falla de fuente se representa como `PARTIAL_SOURCE_FAILURE`. La etapa
+es interna y no es entrada de `data:build:directory`.

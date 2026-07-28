@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "policyId": "web-enrichment-example-v1",
+  "purpose": "INTERNAL_DIRECTORY_RESEARCH",
+  "reviewedAt": "REPLACE_WITH_ISO_DATE",
+  "validUntil": "REPLACE_WITH_ISO_DATE",
+  "sources": [
+    {
+      "sourceId": "replace-with-reviewed-institutional-source",
+      "publisher": "REPLACE_WITH_PUBLISHER",
+      "category": "INSTITUTIONAL_DIRECTORY_MENTION",
+      "enabled": false,
+      "allowedHosts": ["example.org"],
+      "seedUrls": ["https://example.org/public-medical-directory"],
+      "directFetchAllowed": false,
+      "rightsStatus": "PENDING_WRITTEN_REVIEW",
+      "internalResearchAllowed": false,
+      "publicationAllowed": false,
+      "retentionDays": 30
+    }
+  ],
+  "safeguards": {
+    "sourceFirst": true,
+    "searchResultsAreEvidence": false,
+    "automaticIdentityConfirmation": false,
+    "automaticFactConfirmation": false,
+    "automaticPublication": false,
+    "publicExportAllowed": false,
+    "noFindingsProvesAbsence": false
+  }
+}

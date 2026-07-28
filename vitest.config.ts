@@ -8,6 +8,7 @@ const workspaceAliases = {
   '@medicos/credentials/nest': resolve(__dirname, 'packages/modules/credentials/src/nest.ts'),
   '@medicos/credentials': resolve(__dirname, 'packages/modules/credentials/src/index.ts'),
   '@medicos/database': resolve(__dirname, 'packages/platform/database/src/index.ts'),
+  '@medicos/discovery': resolve(__dirname, 'packages/modules/discovery/src/index.ts'),
   '@medicos/health': resolve(__dirname, 'packages/platform/health/src/index.ts'),
   '@medicos/http': resolve(__dirname, 'packages/platform/http/src/index.ts'),
   '@medicos/observability': resolve(__dirname, 'packages/platform/observability/src/index.ts'),

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-28T06:00:00Z",
+  "gitCommit": "REPLACE_WITH_40_CHARACTER_GIT_COMMIT",
+  "dataRoot": "/var/lib/medicos-backend/data",
+  "transfer": {
+    "method": "rsync-staging-then-atomic-rename",
+    "completedAt": "2026-07-28T06:10:00Z"
+  },
+  "artifacts": [
+    {
+      "kind": "MSP_PROFESSIONALS",
+      "manifestRelativePath": "processed/msp/REPLACE_WITH_RUN_ID/manifest.json",
+      "manifestSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "payloadRelativePath": "processed/msp/REPLACE_WITH_RUN_ID/professionals.ndjson",
+      "payloadSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "records": "REPLACE_WITH_RECORD_COUNT"
+    },
+    {
+      "kind": "LINKAGE_CANDIDATES",
+      "manifestRelativePath": "processed/linkage/REPLACE_WITH_RUN_ID/manifest.json",
+      "manifestSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "payloadRelativePath": "processed/linkage/REPLACE_WITH_RUN_ID/candidates.ndjson",
+      "payloadSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "records": "REPLACE_WITH_RECORD_COUNT"
+    },
+    {
+      "kind": "WEB_ENRICHMENT_INTERNAL_QUARANTINE",
+      "manifestRelativePath": "processed/web-enrichment/REPLACE_WITH_RUN_ID/manifest.json",
+      "manifestSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "payloadRelativePath": "processed/web-enrichment/REPLACE_WITH_RUN_ID/candidates.ndjson",
+      "payloadSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "records": "REPLACE_WITH_RECORD_COUNT"
+    },
+    {
+      "kind": "CURATED_PUBLIC_REFERENCES",
+      "manifestRelativePath": null,
+      "manifestSha256": null,
+      "payloadRelativePath": "curation/professional-public-references.ndjson",
+      "payloadSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "records": "REPLACE_WITH_RECORD_COUNT"
+    }
+  ]
+}
