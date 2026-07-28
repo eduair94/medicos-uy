@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "policyId": "replace-after-written-approval",
+  "policyExpiresAt": "",
+  "approvedSnapshot": {
+    "snapshotId": "",
+    "profilesSha256": ""
+  },
+  "releasePrerequisites": {
+    "controllerNotice": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": ""
+    },
+    "databaseRegistration": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": ""
+    },
+    "rightsRequestWorkflow": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": ""
+    },
+    "securityAndRetentionControls": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": ""
+    },
+    "impactAssessmentAndDpoDetermination": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": ""
+    }
+  },
+  "source": {
+    "key": "msp_infotitulos",
+    "publisher": "Ministerio de Salud Pública",
+    "dataset": "Infotítulos",
+    "canonicalUrl": "https://www.gub.uy/ministerio-salud-publica/datos-y-estadisticas/microdatos/infotitulos-base-datos",
+    "liveLookupUrl": "https://www.gub.uy/tramites/infotitulos-consultas-registro-profesionales-salud",
+    "attribution": "Ministerio de Salud Pública - Infotítulos",
+    "validUntil": "",
+    "maxSourceAgeDays": 62,
+    "allowedFieldPaths": [
+      "schemaVersion",
+      "id",
+      "slug",
+      "displayName",
+      "registeredTitles.title",
+      "registeredTitles.temporaryRegistration",
+      "source.publisher",
+      "source.dataset",
+      "source.canonicalUrl",
+      "source.liveLookupUrl",
+      "source.sourceCutoffDate",
+      "source.validUntil",
+      "source.attribution",
+      "source.reuseBasis",
+      "source.policyId",
+      "notice.notMedicalAdvice",
+      "notice.notRealTime",
+      "notice.verifyWithOfficialSource"
+    ],
+    "legalBasis": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": ""
+    },
+    "purposeCompatibility": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": ""
+    },
+    "reuseAuthorization": {
+      "approved": false,
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "reference": "",
+      "basis": "PENDING"
+    }
+  }
+}

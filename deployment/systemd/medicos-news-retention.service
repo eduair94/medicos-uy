@@ -1,0 +1,19 @@
+[Unit]
+Description=Medicos expired news artifact purge
+Documentation=file:/opt/medicos-backend/scripts/ingestion/news/README.md
+After=local-fs.target
+ConditionPathExists=/opt/medicos-backend/package.json
+
+[Service]
+Type=oneshot
+User=medicos
+Group=medicos
+WorkingDirectory=/opt/medicos-backend
+EnvironmentFile=-/etc/medicos-backend/news-retention.env
+ExecStart=/usr/bin/env pnpm data:purge:news:apply
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+UMask=0077
+StandardOutput=journal
+StandardError=journal

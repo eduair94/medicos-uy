@@ -1,0 +1,19 @@
+{
+  "name": "@medicos/command-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/main.js",
+  "dependencies": {
+    "@medicos/config": "workspace:*",
+    "@medicos/health": "workspace:*",
+    "@medicos/http": "workspace:*",
+    "@medicos/observability": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/platform-fastify": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:"
+  }
+}

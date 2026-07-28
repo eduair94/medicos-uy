@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785122513435,
+      "tag": "0000_jittery_nekra",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785162083011,
+      "tag": "0001_opposite_genesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785164055230,
+      "tag": "0002_soft_arclight",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785164649551,
+      "tag": "0003_elite_thaddeus_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785165204303,
+      "tag": "0004_aberrant_leopardon",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+name: medicos-backend
+
+services:
+  catalog-postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-medicos_catalog}
+      POSTGRES_USER: ${POSTGRES_SUPERUSER_USERNAME:-medicos}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?POSTGRES_SUPERUSER_PASSWORD is required}
+      MEDICOS_PUBLIC_QUERY_PASSWORD: ${POSTGRES_PUBLIC_QUERY_PASSWORD:?POSTGRES_PUBLIC_QUERY_PASSWORD is required}
+    ports:
+      - '127.0.0.1:5432:5432'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_SUPERUSER_USERNAME:-medicos} -d ${POSTGRES_DATABASE:-medicos_catalog}
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - catalog-postgres-data:/var/lib/postgresql
+      - ./init:/docker-entrypoint-initdb.d:ro
+
+  queue-redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - queue-redis-data:/data
+
+  cache-redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --save
+      - ''
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    ports:
+      - '127.0.0.1:6380:6379'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  catalog-postgres-data:
+  queue-redis-data:

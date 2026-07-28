@@ -1,0 +1,41 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/platform/config/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/platform/observability/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/platform/database/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/platform/health/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/platform/http/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/platform/worker/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/modules/provenance/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/modules/credentials/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/modules/professionals/tsconfig.build.json"
+    },
+    {
+      "path": "./apps/public-query-api/tsconfig.build.json"
+    },
+    {
+      "path": "./apps/command-api/tsconfig.build.json"
+    },
+    {
+      "path": "./apps/catalog-worker/tsconfig.build.json"
+    }
+  ]
+}

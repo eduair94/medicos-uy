@@ -1,0 +1,51 @@
+node_modules/
+dist/
+coverage/
+.cache/
+.pnpm-store/
+
+.env
+.env.*
+!.env.example
+!.env.data.example
+
+*.log
+*.tsbuildinfo
+
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+.serena/
+.playwright-mcp/
+.agents/
+.codex/
+
+# Public-source snapshots contain real personal data and stay outside Git.
+data/raw/
+data/processed/
+data/normalized/
+data/curation/
+data/logs/
+data/manifests/
+data/validation/
+.env.data.local
+
+# The live server package contains topology, certificates and operational state.
+deployment/server-104/
+
+# Private material must never enter Git, regardless of location.
+**/secrets/
+**/backups/
+**/failed-init-*/
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+service-account*.json
+
+# Research deliverable with case-specific reporting stays outside the code repository.
+INFORME_FACTIBILIDAD_DIRECTORIO_MEDICO_URUGUAY.md

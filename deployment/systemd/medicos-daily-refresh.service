@@ -1,0 +1,24 @@
+[Unit]
+Description=Medicos bounded daily source refresh
+Documentation=file:/opt/medicos-backend/docs/OPERATIONS_DAILY_REFRESH.md
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/medicos-backend/package.json
+
+[Service]
+Type=oneshot
+User=medicos
+Group=medicos
+WorkingDirectory=/opt/medicos-backend
+EnvironmentFile=/etc/medicos-backend/daily-refresh.env
+ExecStart=/usr/bin/flock --nonblock /var/lib/medicos-backend/daily-refresh.lock /usr/bin/env pnpm run data:refresh:daily
+TimeoutStartSec=4h
+TimeoutStopSec=30s
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+UMask=0077
+StandardOutput=journal
+StandardError=journal

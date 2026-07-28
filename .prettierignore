@@ -1,0 +1,9 @@
+node_modules/
+**/dist/
+coverage/
+.cache/
+.serena/
+pnpm-lock.yaml
+drizzle/**/migrations/
+BACKEND_ARCHITECTURE.md
+INFORME_FACTIBILIDAD_DIRECTORIO_MEDICO_URUGUAY.md

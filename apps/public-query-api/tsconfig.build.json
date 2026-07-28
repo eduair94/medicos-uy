@@ -1,0 +1,34 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"],
+  "references": [
+    {
+      "path": "../../packages/platform/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/platform/database/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/platform/health/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/platform/http/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/platform/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/modules/professionals/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/modules/credentials/tsconfig.build.json"
+    }
+  ]
+}

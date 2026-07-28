@@ -1,0 +1,17 @@
+{
+  "name": "@medicos/catalog-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/main.js",
+  "dependencies": {
+    "@medicos/config": "workspace:*",
+    "@medicos/observability": "workspace:*",
+    "@medicos/worker": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:"
+  }
+}

@@ -1,0 +1,404 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "getLiveness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The process is accepting HTTP requests.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } }
+            }
+          }
+        },
+        "summary": "Check whether the process is alive",
+        "tags": ["health"]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All required dependencies are available.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } }
+            }
+          },
+          "503": {
+            "description": "At least one required dependency is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          }
+        },
+        "summary": "Check whether required dependencies are ready",
+        "tags": ["health"]
+      }
+    },
+    "/v1/professionals": {
+      "get": {
+        "description": "Devuelve únicamente perfiles aprobados para publicación. La búsqueda no confirma identidad y el cliente debe revisar la evidencia del detalle.",
+        "operationId": "searchProfessionals",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Coincidencia textual sobre el nombre público del profesional.",
+            "schema": { "maxLength": 200, "example": "Ana Pérez", "type": "string" }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor opaco recibido en la página anterior; no debe interpretarse.",
+            "schema": { "maxLength": 1000, "type": "string" }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 50, "default": 20, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de perfiles públicos.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProfessionalSearchResponseDto" }
+              }
+            }
+          },
+          "400": {
+            "description": "Los parámetros de búsqueda no son válidos.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "429": {
+            "description": "Se superó el límite de solicitudes.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno sin detalles sensibles.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          }
+        },
+        "summary": "Search the public professional directory",
+        "tags": ["professionals"]
+      }
+    },
+    "/v1/professionals/{idOrSlug}": {
+      "get": {
+        "description": "Acepta el UUID público o un slug actual/histórico. La respuesta incluye evidencia de procedencia aprobada.",
+        "operationId": "getProfessional",
+        "parameters": [
+          {
+            "name": "idOrSlug",
+            "required": true,
+            "in": "path",
+            "description": "UUID público o slug del profesional.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil público con evidencia del nombre.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProfessionalDetailResponseDto" }
+              }
+            }
+          },
+          "400": {
+            "description": "El identificador no es válido.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe un perfil publicable para el identificador.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "429": {
+            "description": "Se superó el límite de solicitudes.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno sin detalles sensibles.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          }
+        },
+        "summary": "Get one public professional by UUID or current/historical slug",
+        "tags": ["professionals"]
+      }
+    },
+    "/v1/professionals/{professionalId}/credentials": {
+      "get": {
+        "description": "Solo incluye títulos habilitantes vigentes que superaron el gate de publicación y conservan evidencia pública aprobada.",
+        "operationId": "getProfessionalCredentials",
+        "parameters": [
+          {
+            "name": "professionalId",
+            "required": true,
+            "in": "path",
+            "description": "UUID público del profesional.",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Títulos habilitantes publicables con su evidencia.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProfessionalCredentialsResponseDto" }
+              }
+            }
+          },
+          "400": {
+            "description": "El UUID no es válido.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "404": {
+            "description": "No hay títulos publicables para el profesional.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "429": {
+            "description": "Se superó el límite de solicitudes.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno sin detalles sensibles.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          }
+        },
+        "summary": "Get registered titles for one public professional",
+        "tags": ["credentials"]
+      }
+    }
+  },
+  "info": {
+    "title": "Directorio Médico Uruguay",
+    "description": "API pública, de solo lectura, del directorio médico uruguayo. Los datos pueden estar desactualizados y deben verificarse en su fuente oficial.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Proyecto Directorio Médico Uruguay",
+      "url": "https://github.com/eduair94/medicos-uy/issues"
+    },
+    "license": { "name": "MIT", "url": "https://github.com/eduair94/medicos-uy/blob/main/LICENSE" },
+    "termsOfService": "https://github.com/eduair94/medicos-uy/blob/main/docs/PRIVACY_PUBLICATION_GATE.md"
+  },
+  "tags": [
+    { "name": "professionals", "description": "Búsqueda y detalle de profesionales publicados" },
+    { "name": "credentials", "description": "Títulos habilitantes publicados con evidencia" }
+  ],
+  "servers": [
+    { "url": "https://api.example.invalid", "description": "Servidor público configurado" }
+  ],
+  "components": {
+    "schemas": {
+      "HealthCheck": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "example": "catalog-database" },
+          "status": { "type": "string", "enum": ["up", "down"] }
+        },
+        "required": ["name", "status"]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["ok", "error"] },
+          "service": { "type": "string", "example": "public-query-api" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "checks": { "type": "array", "items": { "$ref": "#/components/schemas/HealthCheck" } }
+        },
+        "required": ["status", "service", "timestamp"]
+      },
+      "ProblemDetailsResponseDto": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "example": "about:blank", "format": "uri-reference" },
+          "title": { "type": "string", "example": "Bad Request" },
+          "status": { "type": "number", "example": 400, "maximum": 599, "minimum": 400 },
+          "detail": { "type": "string", "example": "One or more request fields are invalid." },
+          "instance": {
+            "type": "string",
+            "example": "/v1/professionals?limit=0",
+            "format": "uri-reference"
+          },
+          "traceId": {
+            "type": "string",
+            "example": "c0a80101-7b7f-4f8c-9c84-38ae19fc5a22",
+            "format": "uuid"
+          },
+          "errors": {
+            "example": ["limit must not be less than 1"],
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["type", "title", "status", "detail", "instance", "traceId"]
+      },
+      "ProfessionalSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "slug": { "type": "string" },
+          "displayName": { "type": "string" }
+        },
+        "required": ["id", "slug", "displayName"]
+      },
+      "ProfessionalSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ProfessionalSummaryResponseDto" }
+          },
+          "nextCursor": { "type": "string" }
+        },
+        "required": ["items"]
+      },
+      "PublicEvidenceSourceResponseDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "GOVERNMENT_OPEN_DATA",
+              "OFFICIAL_PUBLICATION",
+              "PROVIDER_AUTHORIZED_FEED",
+              "ACADEMIC_METADATA",
+              "DATA_SUBJECT_CLAIM"
+            ]
+          },
+          "name": { "type": "string" },
+          "canonicalUrl": { "type": "string", "format": "uri" },
+          "licenseUrl": { "type": "string", "format": "uri" },
+          "reuseBasis": {
+            "type": "string",
+            "enum": [
+              "OPEN_DATA_LICENSE",
+              "WRITTEN_AUTHORIZATION",
+              "OFFICIAL_PUBLICATION_REVIEW",
+              "DATA_SUBJECT_CONSENT"
+            ]
+          },
+          "policyId": { "type": "string" },
+          "validUntil": { "type": "string", "format": "date-time" }
+        },
+        "required": ["kind", "name", "canonicalUrl", "reuseBasis", "policyId", "validUntil"]
+      },
+      "PublicEvidenceReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "confidence": {
+            "type": "string",
+            "enum": ["DETERMINISTIC", "HUMAN_VERIFIED", "DATA_SUBJECT_CLAIMED"]
+          },
+          "source": { "$ref": "#/components/schemas/PublicEvidenceSourceResponseDto" },
+          "canonicalUrl": { "type": "string", "format": "uri" },
+          "observedAt": { "type": "string", "format": "date-time" },
+          "sourceCutoffDate": { "type": "string", "format": "date" },
+          "validUntil": { "type": "string", "format": "date-time" },
+          "attribution": { "type": "string" }
+        },
+        "required": [
+          "confidence",
+          "source",
+          "canonicalUrl",
+          "observedAt",
+          "sourceCutoffDate",
+          "attribution"
+        ]
+      },
+      "ProfessionalDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "slug": { "type": "string" },
+          "displayName": { "type": "string" },
+          "nameEvidence": { "$ref": "#/components/schemas/PublicEvidenceReferenceResponseDto" }
+        },
+        "required": ["id", "slug", "displayName", "nameEvidence"]
+      },
+      "RegisteredTitleResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "registrationState": { "type": "string", "enum": ["ENABLED"] },
+          "temporaryRegistration": {
+            "type": "string",
+            "enum": ["NONE", "WITH_CONTRACT", "WITHOUT_CONTRACT"]
+          },
+          "evidence": { "$ref": "#/components/schemas/PublicEvidenceReferenceResponseDto" }
+        },
+        "required": ["id", "title", "registrationState", "temporaryRegistration", "evidence"]
+      },
+      "ProfessionalCredentialsResponseDto": {
+        "type": "object",
+        "properties": {
+          "professionalId": { "type": "string", "format": "uuid" },
+          "registeredTitles": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RegisteredTitleResponseDto" }
+          }
+        },
+        "required": ["professionalId", "registeredTitles"]
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Referencia interactiva con Scalar",
+    "url": "https://api.example.invalid/docs"
+  }
+}
