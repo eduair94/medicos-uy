@@ -336,7 +336,9 @@ describeWithDocker('DrizzleProfessionalReader', () => {
         currentNameEvidenceId: '01985bb6-9fd8-75e3-84a7-b9f81fbe7198',
       }),
     ).rejects.toMatchObject({
-      code: '23503',
+      cause: {
+        code: '23503',
+      },
     });
   });
 
