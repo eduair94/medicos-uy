@@ -10,7 +10,7 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { load } from 'cheerio';
 
@@ -1771,9 +1771,7 @@ function isInside(root: string, candidate: string): boolean {
   const pathFromRoot = relative(root, candidate);
   return (
     pathFromRoot.length === 0 ||
-    (pathFromRoot !== '..' &&
-      !pathFromRoot.startsWith(`..${sep}`) &&
-      !resolve(pathFromRoot).startsWith(sep))
+    (pathFromRoot !== '..' && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot))
   );
 }
 

@@ -630,6 +630,30 @@ describe('privacy-preserving collection', () => {
 });
 
 describe('atomic matcher-compatible artifacts', () => {
+  it('rejects a professional artifact outside DATA_INGESTION_DIR', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'medicos-news-index-boundary-'));
+    temporaryDirectories.push(root);
+    const dataDirectory = join(root, 'data');
+    const outsideDirectory = join(root, 'outside');
+    await Promise.all([
+      mkdir(dataDirectory, { recursive: true }),
+      mkdir(outsideDirectory, { recursive: true }),
+    ]);
+    const professionalsPath = join(outsideDirectory, 'professionals.ndjson');
+    await writeFile(professionalsPath, `${JSON.stringify({ fullName: 'LUCIA PRUEBA' })}\n`, 'utf8');
+
+    await expect(
+      runUruguayanNewsIndexIngestion({
+        dataDirectory,
+        professionalsPath,
+        sources: [source()],
+        fetchImpl: () => Promise.resolve(xmlResponse(rss([]))),
+        now: () => FIXED_NOW,
+        sleep: noSleep,
+      }),
+    ).rejects.toThrow('Professional input must be inside DATA_INGESTION_DIR');
+  });
+
   it('installs a closed-schema NDJSON and provenance manifest together', async () => {
     const root = await mkdtemp(join(tmpdir(), 'medicos-news-index-'));
     temporaryDirectories.push(root);
