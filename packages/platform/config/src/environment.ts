@@ -123,6 +123,7 @@ const baseEnvironmentSchema = z.object({
 const publicQueryApiEnvironmentSchema = baseEnvironmentSchema
   .extend({
     PUBLIC_QUERY_API_PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
+    PUBLIC_QUERY_API_HOST: z.enum(['0.0.0.0', '127.0.0.1', '::1']).default('0.0.0.0'),
     PUBLIC_API_BASE_URL: publicHttpBaseUrlSchema.optional(),
     CATALOG_DATABASE_URL: postgresConnectionUrlSchema,
     CATALOG_DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
@@ -153,7 +154,7 @@ const publicQueryApiEnvironmentSchema = baseEnvironmentSchema
       API_DOCUMENTATION_ENABLED: documentationEnabled,
       PUBLIC_API_BASE_URL:
         environment.PUBLIC_API_BASE_URL ?? `http://localhost:${environment.PUBLIC_QUERY_API_PORT}`,
-      HOST: '0.0.0.0',
+      HOST: environment.PUBLIC_QUERY_API_HOST,
       PORT: environment.PUBLIC_QUERY_API_PORT,
       SERVICE_NAME: 'public-query-api',
     };

@@ -15,6 +15,7 @@ describe('environment validation', () => {
       CATALOG_DATABASE_SSL: 'false',
       CORS_ORIGINS: 'http://localhost:3000, https://example.test ',
       PUBLIC_QUERY_API_PORT: '3101',
+      PUBLIC_QUERY_API_HOST: '127.0.0.1',
       API_DOCUMENTATION_ENABLED: 'true',
       PUBLIC_API_BASE_URL: 'https://api.medicos.test',
     });
@@ -22,7 +23,7 @@ describe('environment validation', () => {
     expect(environment).toMatchObject({
       NODE_ENV: 'test',
       SERVICE_NAME: 'public-query-api',
-      HOST: '0.0.0.0',
+      HOST: '127.0.0.1',
       PORT: 3101,
       CATALOG_DATABASE_SSL: false,
       API_DOCUMENTATION_ENABLED: true,
@@ -35,6 +36,15 @@ describe('environment validation', () => {
     expect(() =>
       validatePublicQueryApiEnvironment({
         CATALOG_DATABASE_URL: 'not-a-url',
+      }),
+    ).toThrow(EnvironmentValidationError);
+  });
+
+  it('rejects an arbitrary public-query bind host', () => {
+    expect(() =>
+      validatePublicQueryApiEnvironment({
+        CATALOG_DATABASE_URL: 'postgresql://user:password@localhost:5432/catalog',
+        PUBLIC_QUERY_API_HOST: 'example.test',
       }),
     ).toThrow(EnvironmentValidationError);
   });

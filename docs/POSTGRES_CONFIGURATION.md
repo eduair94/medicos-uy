@@ -65,8 +65,9 @@ El seed se niega en producción y contiene solo personas/URLs sintéticas.
 ## Docker local
 
 Copie `.env.example` a `.env` y cambie sus contraseñas de ejemplo. Compose exige
-`POSTGRES_SUPERUSER_PASSWORD` y `POSTGRES_PUBLIC_QUERY_PASSWORD`; el init crea el rol lector a
-partir del entorno. Estos scripts solo corren al crear un volumen nuevo.
+`POSTGRES_SUPERUSER_PASSWORD`, `POSTGRES_PUBLIC_QUERY_PASSWORD` y
+`POSTGRES_PRIVATE_INGESTOR_PASSWORD`; el init crea el rol lector y el escritor privado de mínimo
+privilegio a partir del entorno. Estos scripts solo corren al crear un volumen nuevo.
 
 ```bash
 corepack pnpm infra:up

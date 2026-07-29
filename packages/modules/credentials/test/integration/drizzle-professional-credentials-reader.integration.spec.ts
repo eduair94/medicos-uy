@@ -51,6 +51,16 @@ describeWithDocker('DrizzleProfessionalCredentialsReader', () => {
         nocreaterole
         noreplication
     `);
+    await pool.query(`
+      create role medicos_private_ingestor
+        nologin
+        noinherit
+        nosuperuser
+        nocreatedb
+        nocreaterole
+        noreplication
+        nobypassrls
+    `);
     const database: CatalogDatabase = drizzle(pool, {
       casing: 'snake_case',
     });

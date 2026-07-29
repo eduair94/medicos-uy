@@ -1,5 +1,19 @@
 # Análisis privado completo con PM2
 
+La misma definición PM2 también ejecuta la API pública de solo lectura como
+`medicos-public-query-api`. Su archivo de entorno es
+`/etc/medicos-backend/public-query-api.env` (`root:root`, modo `0600`) y el proceso exige
+`PUBLIC_QUERY_API_HOST=127.0.0.1` para quedar accesible únicamente mediante el origen local del
+túnel:
+
+```text
+http://127.0.0.1:3001
+```
+
+Con el hostname definitivo configurado en `PUBLIC_API_BASE_URL`, la documentación queda publicada
+en `/docs`, el contrato en `/openapi.json`, el catálogo en `/.well-known/api-catalog` y RSD en
+`/rsd.xml`.
+
 Este proceso construye y persiste el análisis interno de todos los profesionales del snapshot MSP
 seleccionado. No publica resultados, no confirma identidades a partir de coincidencias flexibles y
 no reemplaza la revisión humana.

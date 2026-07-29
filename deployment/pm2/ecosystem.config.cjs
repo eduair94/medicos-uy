@@ -1,9 +1,34 @@
 const applicationDirectory = process.env.MEDICOS_APP_DIRECTORY || '/srv/medicos-backend/current';
 const environmentFile =
   process.env.MEDICOS_ANALYSIS_ENV_FILE || '/etc/medicos-backend/private-analysis.env';
+const publicQueryEnvironmentFile =
+  process.env.MEDICOS_PUBLIC_QUERY_ENV_FILE || '/etc/medicos-backend/public-query-api.env';
 
 module.exports = {
   apps: [
+    {
+      name: 'medicos-public-query-api',
+      cwd: applicationDirectory,
+      script: 'deployment/pm2/run-public-query-api.sh',
+      interpreter: '/bin/sh',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      restart_delay: 3000,
+      max_restarts: 10,
+      min_uptime: 10000,
+      max_memory_restart: '512M',
+      kill_timeout: 30000,
+      time: true,
+      merge_logs: true,
+      out_file: '/var/log/medicos-backend/public-query-api.out.log',
+      error_file: '/var/log/medicos-backend/public-query-api.error.log',
+      env: {
+        NODE_ENV: 'production',
+        TZ: 'UTC',
+        MEDICOS_PUBLIC_QUERY_ENV_FILE: publicQueryEnvironmentFile,
+      },
+    },
     {
       name: 'medicos-private-analysis',
       cwd: applicationDirectory,
