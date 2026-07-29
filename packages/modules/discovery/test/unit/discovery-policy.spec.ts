@@ -278,4 +278,25 @@ describe('discovery policy', () => {
     await expect(adapter.discover('otra consulta', 1)).rejects.toThrow('circuit is open');
     expect(fetchImplementation).toHaveBeenCalledTimes(1);
   });
+
+  it('decodes each DuckDuckGo HTML entity only once', async () => {
+    const policy = createSourceUrlPolicy({ allowedHostnames: ['example.org'] });
+    const fetchImplementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(
+          '<a class="result__a" href="https://example.org/?label=&amp;quot;">resultado</a>',
+          { status: 200 },
+        ),
+      );
+    const adapter = new DuckDuckGoSearchAdapter({
+      resultUrlPolicy: policy,
+      fetchImplementation,
+    });
+
+    const results = await adapter.discover('consulta de prueba', 1);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.url).toBe('https://example.org/?label=&quot;');
+  });
 });

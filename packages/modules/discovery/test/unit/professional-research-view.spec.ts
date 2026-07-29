@@ -4,6 +4,7 @@ import {
   buildProfessionalResearchView,
   evaluateResearchPersonName,
   institutionalSourceRecordKey,
+  normalizeResearchPersonName,
   type BuildProfessionalResearchViewInput,
   type CuratedPublicReference,
   type ResearchInstitutionalLinkageCandidate,
@@ -319,5 +320,12 @@ describe('professional research view', () => {
         meaning: 'LOOSENESS_NOT_IDENTITY_CONFIDENCE',
       }),
     );
+    expect(
+      evaluateResearchPersonName(
+        'TAMARA DIAZ SANZ FERNANDEZ',
+        'Dra. Tamara (consulta externa) Diaz Sanz Fernandez',
+      ),
+    ).toEqual(expect.objectContaining({ kind: 'EXACT_NORMALIZED_NAME', flexibilityIndex: 0 }));
+    expect(normalizeResearchPersonName(`${'('.repeat(20_000)}X`)).toBe('X');
   });
 });

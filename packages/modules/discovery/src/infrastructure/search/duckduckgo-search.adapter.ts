@@ -15,12 +15,15 @@ export interface DuckDuckGoSearchAdapterOptions {
 }
 
 function decodeHtml(value: string): string {
-  return value
-    .replaceAll('&amp;', '&')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&#x27;', "'")
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>');
+  const entities: Readonly<Record<string, string>> = {
+    '&amp;': '&',
+    '&quot;': '"',
+    '&#x27;': "'",
+    '&lt;': '<',
+    '&gt;': '>',
+  };
+
+  return value.replace(/&(?:amp|quot|#x27|lt|gt);/gu, (entity) => entities[entity] ?? entity);
 }
 
 export class DuckDuckGoSearchAdapter implements SearchDiscoveryPort {

@@ -40,8 +40,30 @@ function reorderSurnameFirst(value: string): string {
   return surname === undefined || givenNames === undefined ? value : `${givenNames} ${surname}`;
 }
 
+function removeParentheticalNotes(value: string): string {
+  let cursor = 0;
+  let result = '';
+
+  while (cursor < value.length) {
+    const openingIndex = value.indexOf('(', cursor);
+    if (openingIndex === -1) {
+      return result + value.slice(cursor);
+    }
+
+    const closingIndex = value.indexOf(')', openingIndex + 1);
+    if (closingIndex === -1) {
+      return result + value.slice(cursor);
+    }
+
+    result += `${value.slice(cursor, openingIndex)} `;
+    cursor = closingIndex + 1;
+  }
+
+  return result;
+}
+
 export function normalizeResearchPersonName(value: string): string {
-  const withoutParentheticalNotes = value.replace(/\([^)]*\)/gu, ' ');
+  const withoutParentheticalNotes = removeParentheticalNotes(value);
   const withoutHonorific = removeDiacritics(
     withoutParentheticalNotes.replace(/\u00a0/gu, ' ').trim(),
   ).replace(LEADING_HONORIFIC, '');
