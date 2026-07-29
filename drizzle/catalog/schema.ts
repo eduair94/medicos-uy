@@ -32,5 +32,9 @@ export {
 export {
   privateDirectorySnapshotTable,
   privateIngestionSchema,
+  privateMspCatalogEvidenceIdentityTable,
+  privateMspCatalogIdentityTable,
+  privateMspCatalogSourceTable,
+  privateMspCatalogTitleIdentityTable,
   privateProfessionalProfileTable,
 } from '../ingestion-private/schema';

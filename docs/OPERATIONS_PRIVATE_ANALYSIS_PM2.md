@@ -14,9 +14,11 @@ Con el hostname definitivo configurado en `PUBLIC_API_BASE_URL`, la documentaci�
 en `/docs`, el contrato en `/openapi.json`, el catálogo en `/.well-known/api-catalog` y RSD en
 `/rsd.xml`.
 
-Este proceso construye y persiste el análisis interno de todos los profesionales del snapshot MSP
-seleccionado. No publica resultados, no confirma identidades a partir de coincidencias flexibles y
-no reemplaza la revisión humana.
+Este proceso ejecuta dos etapas fail-fast. Primero construye y persiste el análisis interno de
+todos los profesionales del snapshot MSP seleccionado. Si esa etapa termina correctamente, proyecta
+al catálogo público **únicamente** nombre y títulos oficiales de Infotítulos, con evidencia,
+claims, vigencia y rutas estables. No publica candidatos, agendas, noticias, sanciones ni resultados
+del análisis privado; tampoco confirma identidades a partir de coincidencias flexibles.
 
 PM2 mantiene un único scheduler vivo. El proceso ejecuta el batch una vez al iniciar o reiniciar y
 luego queda inactivo. `cron_restart` lo reinicia diariamente a las **06:37 UTC**, equivalentes a
@@ -33,6 +35,10 @@ servidor 104.
 - máximo PM2 de 1536 MiB y heap Node de 1024 MiB;
 - un error del batch queda registrado y el scheduler espera el próximo cron, sin bucle de reinicios;
 - credenciales únicamente en un archivo `root:root 0600` externo al checkout;
+- la proyección MSP exige aprobación explícita, referencia oficial y responsable de la revisión;
+- evidencia inmutable por snapshot, vencimiento a 62 días del corte y supresión de ausentes;
+- una reaparición sólo revierte una supresión automática si nadie moderó la fila mientras estuvo
+  ausente; `DISABLED` y `UNDER_REVIEW` nunca son reactivados por el scheduler;
 - `CMU_ETHICS_FETCH_ENABLED=false` es obligatorio y el wrapper aborta si alguien intenta activarlo.
 
 La
@@ -67,6 +73,13 @@ del certificado en `PROFESSIONAL_ANALYSIS_DATABASE_SSL_CA_PATH` y
 `PROFESSIONAL_ANALYSIS_DATABASE_SSL_SERVERNAME`. El release debe conservar su ejecutable Linux
 `node_modules/.bin/tsx`; no dependa de un `pnpm` global inexistente en el host. Nunca copie la
 contraseña a la línea de comandos, al ecosistema o al log.
+
+Complete además `MSP_CATALOG_PROJECTION_APPROVAL=PROJECT_OFFICIAL_MSP_FIELDS`,
+`MSP_CATALOG_PROJECTION_REVIEWED_BY` con el identificador del operador o cambio aprobado y
+`MSP_CATALOG_PROJECTION_REVIEWED_AT` con la fecha UTC ISO-8601 exacta de esa aprobación, y
+`MSP_CATALOG_PROJECTION_REVIEW_REFERENCE` con la URL oficial exacta de Infotítulos. La función
+PostgreSQL se ejecuta con privilegios definidos y el rol de ingesta conserva acceso directo
+revocado sobre `catalog`, `credentials`, `provenance` y las tablas privadas de mapeo.
 
 ## Sincronizar los datos sin aceptar un lote parcial
 
@@ -149,11 +162,20 @@ GROUP BY status ORDER BY status;
 SELECT run_id, snapshot_id, status, started_at, heartbeat_at, completed_at
 FROM research_private.analysis_run
 ORDER BY created_at DESC LIMIT 5;
+
+SELECT count(*) FROM catalog.public_professional;
+SELECT count(*) FROM catalog.public_professional_route WHERE route_kind = 'CURRENT';
+SELECT count(*) FROM credentials.public_registered_title;
+SELECT count(*) FROM provenance.public_evidence_ref;
 ```
 
 Los totales terminales deben reconciliar con el número de perfiles del snapshot privado. Revise
 separadamente `FAILED`, `PARTIAL`, candidatos no adjudicados y cobertura de fuentes; no interprete
-`NO_CANDIDATE` como “sin antecedentes”.
+`NO_CANDIDATE` como “sin antecedentes”. La proyección es idempotente: repetir el mismo snapshot no
+crea UUID, rutas ni evidencia duplicados. Un snapshot posterior conserva identidad pública,
+revoca la evidencia anterior y suprime perfiles ausentes. Una reaparición reactiva únicamente una
+supresión automática intacta; cualquier intervención posterior del operador conserva
+`SUPPRESSED`.
 
 ## Operación y recuperación
 

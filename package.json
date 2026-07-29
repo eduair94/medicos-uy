@@ -74,6 +74,7 @@
     "data:analyze:all-professionals": "tsx scripts/ingestion/research/build-and-persist-all-professionals.ts",
     "data:build:directory": "tsx scripts/ingestion/directory/build-directory-snapshot.ts",
     "data:build:public-directory": "tsx scripts/ingestion/publication/build-public-directory-export.ts",
+    "data:sync:msp-catalog": "tsx scripts/ingestion/publication/sync-msp-catalog.ts",
     "data:import:private-directory": "tsx scripts/ingestion/private/import-factual-directory.ts",
     "data:refresh:daily": "tsx scripts/ingestion/run-daily-refresh.ts",
     "data:refresh:daily:plan": "tsx scripts/ingestion/run-daily-refresh.ts --dry-run",

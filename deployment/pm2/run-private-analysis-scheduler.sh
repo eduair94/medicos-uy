@@ -30,6 +30,7 @@ flock_executable="${MEDICOS_FLOCK_EXECUTABLE:-/usr/bin/flock}"
 lock_file="${MEDICOS_ANALYSIS_LOCK_FILE:-/var/lib/medicos-backend/private-analysis.lock}"
 status_file="${MEDICOS_ANALYSIS_STATUS_FILE:-/var/lib/medicos-backend/logs/private-analysis/latest.json}"
 analysis_entrypoint="${application_directory}/scripts/ingestion/research/build-and-persist-all-professionals.ts"
+projection_entrypoint="${application_directory}/scripts/ingestion/publication/sync-msp-catalog.ts"
 
 if [ "${CMU_ETHICS_FETCH_ENABLED:-false}" != "false" ]; then
   echo "CMU_ETHICS_FETCH_ENABLED must remain false: automated Colegio Medico ethics crawling is prohibited" >&2
@@ -37,7 +38,9 @@ if [ "${CMU_ETHICS_FETCH_ENABLED:-false}" != "false" ]; then
 fi
 export CMU_ETHICS_FETCH_ENABLED=false
 
-if [ ! -f "${application_directory}/package.json" ] || [ ! -f "${analysis_entrypoint}" ]; then
+if [ ! -f "${application_directory}/package.json" ] ||
+  [ ! -f "${analysis_entrypoint}" ] ||
+  [ ! -f "${projection_entrypoint}" ]; then
   echo "Medicos application or private analysis entrypoint is unavailable: ${application_directory}" >&2
   exit 1
 fi
@@ -67,6 +70,22 @@ if [ -z "${PROFESSIONAL_ANALYSIS_DATABASE_SSL_CA_PATH:-}" ]; then
 fi
 if [ -z "${PROFESSIONAL_ANALYSIS_DATABASE_SSL_SERVERNAME:-}" ]; then
   echo "PROFESSIONAL_ANALYSIS_DATABASE_SSL_SERVERNAME is required" >&2
+  exit 1
+fi
+if [ "${MSP_CATALOG_PROJECTION_APPROVAL:-}" != "PROJECT_OFFICIAL_MSP_FIELDS" ]; then
+  echo "MSP_CATALOG_PROJECTION_APPROVAL is missing or invalid" >&2
+  exit 1
+fi
+if [ -z "${MSP_CATALOG_PROJECTION_REVIEWED_BY:-}" ]; then
+  echo "MSP_CATALOG_PROJECTION_REVIEWED_BY is required" >&2
+  exit 1
+fi
+if [ -z "${MSP_CATALOG_PROJECTION_REVIEWED_AT:-}" ]; then
+  echo "MSP_CATALOG_PROJECTION_REVIEWED_AT is required" >&2
+  exit 1
+fi
+if [ "${MSP_CATALOG_PROJECTION_REVIEW_REFERENCE:-}" != "https://www.gub.uy/ministerio-salud-publica/datos-y-estadisticas/microdatos/infotitulos-base-datos" ]; then
+  echo "MSP_CATALOG_PROJECTION_REVIEW_REFERENCE must be the official MSP Infotitulos URL" >&2
   exit 1
 fi
 
@@ -134,8 +153,18 @@ else
   analysis_pid="$!"
 
   if wait "${analysis_pid}"; then
-    analysis_exit_code=0
-    analysis_state="COMPLETED"
+    analysis_pid=''
+    echo '{"event":"msp_catalog_projection_started"}'
+    "${tsx_executable}" "${projection_entrypoint}" &
+    analysis_pid="$!"
+
+    if wait "${analysis_pid}"; then
+      analysis_exit_code=0
+      analysis_state="COMPLETED"
+    else
+      analysis_exit_code="$?"
+      analysis_state="FAILED"
+    fi
   else
     analysis_exit_code="$?"
     analysis_state="FAILED"

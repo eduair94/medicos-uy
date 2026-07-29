@@ -36,9 +36,14 @@ El pipeline declara explícitamente:
 - no mutar la base de la API;
 - no convertir un score de revisión en probabilidad.
 
-La carga transaccional de una exportación aprobada a PostgreSQL debe implementarse como un adaptador
-independiente antes de poder afirmar que la API se actualiza sola. Hasta entonces el cron refresca
-la zona de investigación y el catálogo público continúa con el último release aprobado.
+La proyección transaccional mínima MSP está implementada como
+`data:sync:msp-catalog` y se ejecuta en el scheduler PM2 después de un análisis correcto. Consume
+exclusivamente el último snapshot privado completo y una aprobación operativa explícita; no
+proyecta candidatos ni fuentes web. El identificador del snapshot queda fijado en el entorno y la
+función rechaza cualquier lote distinto, aunque sea más reciente. Este pipeline diario de
+recolección todavía no importa por sí
+mismo el nuevo snapshot a PostgreSQL: esa transferencia verificada debe terminar antes de ejecutar
+la proyección.
 
 ## Variables
 
