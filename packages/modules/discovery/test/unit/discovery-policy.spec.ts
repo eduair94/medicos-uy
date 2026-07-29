@@ -107,6 +107,7 @@ describe('discovery policy', () => {
       restrictedReason: 'ADVERSE_OR_JUDICIAL',
     });
     expect(classifySourceContent('captcha anomaly-modal')).toBe('AUTOMATION_CHALLENGE');
+    expect(classifySourceContent('historia clinica del paciente')).toBe('MINOR_OR_PRIVATE_HEALTH');
   });
 
   it('creates exhaustive coverage whose absence is explicitly non-probative', () => {
@@ -136,6 +137,57 @@ describe('discovery policy', () => {
       'NO_CANDIDATE_WITHIN_CONFIGURED_SCOPE',
     ]);
     expect(coverage.every(({ noFindingsProvesAbsence }) => !noFindingsProvesAbsence)).toBe(true);
+    expect(
+      buildCoverage({
+        professionals,
+        candidates: [],
+        sourceFailures: 1,
+        restrictedPageCount: 0,
+        plannedSourcePages: 1,
+        completedSourcePages: 0,
+        professionalSnapshotSha256: 'b'.repeat(64),
+        sourcePolicySha256: 'c'.repeat(64),
+        observedAt: '2026-07-28T00:00:00.000Z',
+      })[0]?.status,
+    ).toBe('PARTIAL_SOURCE_FAILURE');
+    expect(
+      buildCoverage({
+        professionals,
+        candidates: [],
+        sourceFailures: 0,
+        restrictedPageCount: 1,
+        plannedSourcePages: 1,
+        completedSourcePages: 1,
+        professionalSnapshotSha256: 'b'.repeat(64),
+        sourcePolicySha256: 'c'.repeat(64),
+        observedAt: '2026-07-28T00:00:00.000Z',
+      })[0]?.status,
+    ).toBe('BLOCKED_BY_SOURCE_POLICY');
+  });
+
+  it.each([
+    '0.1.2.3',
+    '10.1.2.3',
+    '127.0.0.1',
+    '224.0.0.1',
+    '169.254.1.2',
+    '172.16.1.2',
+    '192.168.1.2',
+    '100.64.1.2',
+    '::1',
+    'fc00::1',
+    'fd00::1',
+    'fe80::1',
+    'fe90::1',
+    'fea0::1',
+    'feb0::1',
+    'service.localhost',
+    'service.local',
+    'service.internal',
+  ])('rejects reserved source hostname %s', (hostname) => {
+    expect(() => createSourceUrlPolicy({ allowedHostnames: [hostname] })).toThrow(
+      'public hostname',
+    );
   });
 
   it('rejects credentials, private networks and off-allowlist redirects', async () => {
