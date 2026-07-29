@@ -266,7 +266,8 @@ export async function runMspCatalogProjection(
     connectionString: configuration.databaseUrl,
     application_name: 'medicos-msp-catalog-projection',
     connectionTimeoutMillis: 5_000,
-    statement_timeout: 300_000,
+    // The initial 27k-profile backfill can exceed five minutes on shared server 104.
+    statement_timeout: 900_000,
     idle_in_transaction_session_timeout: 300_000,
     ssl: {
       ca: configuration.databaseCa,

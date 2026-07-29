@@ -33,6 +33,7 @@ servidor 104.
   `/var/lib/medicos-backend/logs/private-analysis/latest.json`;
 - `SIGTERM`/`SIGINT` se reenvían al batch y PM2 concede 120 segundos antes de terminar el árbol;
 - máximo PM2 de 1536 MiB y heap Node de 1024 MiB;
+- hasta 15 minutos para la proyección PostgreSQL atómica del universo MSP completo;
 - un error del batch queda registrado y el scheduler espera el próximo cron, sin bucle de reinicios;
 - credenciales únicamente en un archivo `root:root 0600` externo al checkout;
 - la proyección MSP exige aprobación explícita, referencia oficial y responsable de la revisión;
