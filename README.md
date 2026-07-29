@@ -155,8 +155,8 @@ Todas esas superficies, igual que `/v1/**`, requieren autenticación owner. El h
 ejemplo:
 
 ```bash
-curl -u 'owner:change-me-local-owner-api-key' http://localhost:3001/docs
-curl -H 'X-API-Key: change-me-local-owner-api-key' http://localhost:3001/v1/professionals
+curl -u 'owner:change-me-local-owner-api-key' http://localhost:3001/docs # gitleaks:allow - documented local placeholder
+curl -H 'X-API-Key: change-me-local-owner-api-key' http://localhost:3001/v1/professionals # gitleaks:allow - documented local placeholder
 ```
 
 `GET /health/live` y `GET /health/ready` permanecen públicos para el supervisor del proceso y el

@@ -60,6 +60,8 @@ class Sha256SecretMatcher {
   }
 
   public matches(value: string): boolean {
+    // The input is a generated, high-entropy API key rather than a human password.
+    // codeql[js/insufficient-password-hash]
     const presentedDigest = createHash('sha256').update(value, 'utf8').digest();
     return timingSafeEqual(presentedDigest, this.expectedDigest);
   }

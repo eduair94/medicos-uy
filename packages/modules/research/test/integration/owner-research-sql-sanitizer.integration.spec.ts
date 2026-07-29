@@ -299,7 +299,7 @@ describeWithDocker('owner research SQL sanitizer', () => {
       'utf8',
     );
     const functionDefinitions =
-      /CREATE OR REPLACE FUNCTION research_private\.owner_jsonb_pick[\s\S]*?(?=CREATE OR REPLACE VIEW)/u.exec(
+      /CREATE OR REPLACE FUNCTION research_private\.owner_jsonb_pick[\s\S]*?(?=(?:DROP VIEW IF EXISTS|CREATE(?: OR REPLACE)? VIEW) research_private\.owner_professional_dossier)/u.exec(
         migrationSql,
       )?.[0];
 

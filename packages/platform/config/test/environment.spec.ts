@@ -9,7 +9,7 @@ import {
 
 const ownerApiKeyAuthentication = {
   OWNER_API_BASIC_USERNAME: 'owner',
-  OWNER_API_KEY_SHA256: 'c64bcba7b5650a21e86aaa762fe60684b0cf4d9791120337bdb840047907fb0e',
+  OWNER_API_KEY_SHA256: 'c64bcba7b5650a21e86aaa762fe60684b0cf4d9791120337bdb840047907fb0e', // gitleaks:allow - deterministic test fixture
 } as const;
 const ownerResearchDatabase = {
   OWNER_RESEARCH_DATABASE_URL: 'postgresql://owner:password@localhost:5432/research',

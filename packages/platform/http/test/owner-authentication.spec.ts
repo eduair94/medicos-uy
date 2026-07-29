@@ -15,6 +15,8 @@ import {
 } from '../src';
 
 const OWNER_API_KEY = 'unit-test-owner-key';
+// This deterministic digest is a test fixture, not password storage.
+// codeql[js/insufficient-password-hash]
 const OWNER_API_KEY_SHA256 = createHash('sha256').update(OWNER_API_KEY, 'utf8').digest('hex');
 
 describe('owner authentication', () => {
@@ -154,6 +156,8 @@ describe('owner authentication', () => {
       await Promise.resolve();
       return payload;
     });
+    // This isolated test exercises hook termination; production bootstrap registers rate limiting.
+    // codeql[js/missing-rate-limiting]
     application.get('/protected', protectedHandler);
 
     try {

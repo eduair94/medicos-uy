@@ -28,7 +28,7 @@ function configureDeterministicEnvironment(): void {
       'postgresql://contract:contract@127.0.0.1:9/medicos_openapi_contract',
     OWNER_RESEARCH_DATABASE_POOL_MAX: '1',
     OWNER_API_BASIC_USERNAME: 'owner',
-    OWNER_API_KEY_SHA256: 'c64bcba7b5650a21e86aaa762fe60684b0cf4d9791120337bdb840047907fb0e',
+    OWNER_API_KEY_SHA256: 'c64bcba7b5650a21e86aaa762fe60684b0cf4d9791120337bdb840047907fb0e', // gitleaks:allow - deterministic contract fixture
   });
 }
 
