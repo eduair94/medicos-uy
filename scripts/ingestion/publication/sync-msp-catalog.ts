@@ -205,6 +205,8 @@ export async function projectLatestMspSnapshot(
 ): Promise<MspCatalogProjectionResult> {
   await connection.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
 
+  let result: MspCatalogProjectionResult;
+
   try {
     const projection = await connection.query<ProjectionRow>(
       `SELECT
@@ -226,7 +228,7 @@ export async function projectLatestMspSnapshot(
     }
 
     const row = projection.rows[0];
-    const result: MspCatalogProjectionResult = {
+    result = {
       snapshotId: row.snapshot_id,
       projectedProfessionals: checkedCount(
         row.projected_professionals,
@@ -243,7 +245,6 @@ export async function projectLatestMspSnapshot(
     };
 
     await connection.query('COMMIT');
-    return result;
   } catch (error) {
     try {
       await connection.query('ROLLBACK');
@@ -257,6 +258,22 @@ export async function projectLatestMspSnapshot(
 
     throw error;
   }
+
+  // ANALYZE updates planner metadata outside the projection transaction. Running it only after
+  // COMMIT prevents a later rollback from leaving non-transactional pg_class estimates behind.
+  try {
+    const statistics = await connection.query('SELECT catalog.analyze_msp_public_projection()');
+
+    if (statistics.rowCount !== 1) {
+      throw new Error('MSP catalog statistics refresh did not return exactly one result');
+    }
+  } catch (error) {
+    throw new Error('MSP catalog projection committed but PostgreSQL statistics refresh failed', {
+      cause: error,
+    });
+  }
+
+  return result;
 }
 
 export async function runMspCatalogProjection(

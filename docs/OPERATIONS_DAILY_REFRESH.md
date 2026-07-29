@@ -43,7 +43,10 @@ proyecta candidatos ni fuentes web. El identificador del snapshot queda fijado e
 función rechaza cualquier lote distinto, aunque sea más reciente. Este pipeline diario de
 recolección todavía no importa por sí
 mismo el nuevo snapshot a PostgreSQL: esa transferencia verificada debe terminar antes de ejecutar
-la proyección.
+la proyección. Tras el `COMMIT`, el mismo proceso actualiza las estadísticas del planificador sobre
+un conjunto fijo de tablas mediante una función de privilegio mínimo. Un fallo de `ANALYZE` marca la
+ejecución como fallida, pero no intenta revertir la proyección ya confirmada; el siguiente cron
+idempotente repite la actualización.
 
 ## Variables
 

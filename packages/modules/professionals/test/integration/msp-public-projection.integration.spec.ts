@@ -224,6 +224,14 @@ describeWithDocker('catalog.refresh_msp_public_projection', () => {
       }
 
       await connection.query('commit');
+
+      await connection.query('set role medicos_private_ingestor');
+      try {
+        await connection.query('select catalog.analyze_msp_public_projection()');
+      } finally {
+        await connection.query('reset role');
+      }
+
       return row;
     } catch (error) {
       await connection.query('rollback');
@@ -345,6 +353,61 @@ describeWithDocker('catalog.refresh_msp_public_projection', () => {
       identities: 1,
       evidenceIdentities: 1,
       titleIdentities: 1,
+    });
+
+    const analyzedRelations = await pool.query<{
+      readonly estimatedRows: number;
+      readonly relationName: string;
+    }>(`
+      select
+        namespace.nspname || '.' || relation.relname as "relationName",
+        relation.reltuples::integer as "estimatedRows"
+      from pg_catalog.pg_class as relation
+      inner join pg_catalog.pg_namespace as namespace
+        on namespace.oid = relation.relnamespace
+      where (namespace.nspname, relation.relname) in (
+        ('catalog', 'professional'),
+        ('catalog', 'professional_route'),
+        ('credentials', 'registered_title'),
+        ('provenance', 'evidence_ref'),
+        ('provenance', 'evidence_claim')
+      )
+      order by "relationName"
+    `);
+    expect(analyzedRelations.rows).toEqual([
+      { estimatedRows: 1, relationName: 'catalog.professional' },
+      { estimatedRows: 1, relationName: 'catalog.professional_route' },
+      { estimatedRows: 1, relationName: 'credentials.registered_title' },
+      { estimatedRows: 2, relationName: 'provenance.evidence_claim' },
+      { estimatedRows: 1, relationName: 'provenance.evidence_ref' },
+    ]);
+
+    const statisticsPrivileges = await pool.query<{
+      readonly catalogReaderCanExecute: boolean;
+      readonly ingestorCanExecute: boolean;
+      readonly ingestorHasMaintain: boolean;
+    }>(`
+      select
+        pg_catalog.has_function_privilege(
+          'medicos_catalog_reader',
+          'catalog.analyze_msp_public_projection()',
+          'EXECUTE'
+        ) as "catalogReaderCanExecute",
+        pg_catalog.has_function_privilege(
+          'medicos_private_ingestor',
+          'catalog.analyze_msp_public_projection()',
+          'EXECUTE'
+        ) as "ingestorCanExecute",
+        pg_catalog.has_table_privilege(
+          'medicos_private_ingestor',
+          'catalog.professional',
+          'MAINTAIN'
+        ) as "ingestorHasMaintain"
+    `);
+    expect(statisticsPrivileges.rows[0]).toEqual({
+      catalogReaderCanExecute: false,
+      ingestorCanExecute: true,
+      ingestorHasMaintain: false,
     });
 
     const publicProfessionals = await pool.query<{ readonly display_name: string }>(

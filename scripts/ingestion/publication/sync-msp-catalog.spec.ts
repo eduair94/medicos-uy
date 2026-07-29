@@ -152,6 +152,13 @@ describe('MSP catalog projection transaction', () => {
           });
         }
 
+        if (text.includes('analyze_msp_public_projection')) {
+          return Promise.resolve({
+            rows: [{}] as unknown as readonly Row[],
+            rowCount: 1,
+          });
+        }
+
         return Promise.resolve({
           rows: [],
           rowCount: 0,
@@ -173,7 +180,8 @@ describe('MSP catalog projection transaction', () => {
       enabledRegisteredTitles: 3,
     });
     expect(calls[0]).toBe('BEGIN ISOLATION LEVEL SERIALIZABLE');
-    expect(calls.at(-1)).toBe('COMMIT');
+    expect(calls.at(-2)).toBe('COMMIT');
+    expect(calls.at(-1)).toContain('analyze_msp_public_projection');
     expect(projectionValues).toEqual([
       'Integration operator',
       MSP_INFOTITULOS_OFFICIAL_URL,
@@ -213,5 +221,49 @@ describe('MSP catalog projection transaction', () => {
       }),
     ).rejects.toThrow('invalid projected professional count');
     expect(calls.at(-1)).toBe('ROLLBACK');
+  });
+
+  it('fails explicitly without rolling back an already committed projection when ANALYZE fails', async () => {
+    const calls: string[] = [];
+    const connection: MspCatalogProjectionConnection = {
+      query<Row extends Record<string, unknown>>(text: string) {
+        calls.push(text);
+
+        if (text.includes('refresh_msp_public_projection')) {
+          return Promise.resolve({
+            rows: [
+              {
+                snapshot_id: 'factual-v3-0123456789abcdef',
+                projected_professionals: '2',
+                suppressed_professionals: '0',
+                enabled_registered_titles: '3',
+              },
+            ] as unknown as readonly Row[],
+            rowCount: 1,
+          });
+        }
+
+        if (text.includes('analyze_msp_public_projection')) {
+          return Promise.reject(new Error('synthetic ANALYZE failure'));
+        }
+
+        return Promise.resolve({
+          rows: [],
+          rowCount: 0,
+        });
+      },
+    };
+
+    await expect(
+      projectLatestMspSnapshot(connection, {
+        expectedSnapshotId: 'factual-v3-0123456789abcdef',
+        publicationReviewedBy: 'Integration operator',
+        publicationReviewedAt: PUBLICATION_REVIEWED_AT,
+        publicationReviewReference: MSP_INFOTITULOS_OFFICIAL_URL,
+      }),
+    ).rejects.toThrow('MSP catalog projection committed but PostgreSQL statistics refresh failed');
+    expect(calls.at(-2)).toBe('COMMIT');
+    expect(calls.at(-1)).toContain('analyze_msp_public_projection');
+    expect(calls).not.toContain('ROLLBACK');
   });
 });

@@ -37,6 +37,9 @@ servidor 104.
 - un error del batch queda registrado y el scheduler espera el próximo cron, sin bucle de reinicios;
 - credenciales únicamente en un archivo `root:root 0600` externo al checkout;
 - la proyección MSP exige aprobación explícita, referencia oficial y responsable de la revisión;
+- después de confirmar la proyección, un helper `SECURITY DEFINER` actualiza únicamente las
+  estadísticas de sus tablas; si `ANALYZE` falla, el job queda `FAILED` sin intentar revertir datos
+  ya confirmados y el siguiente replay idempotente vuelve a intentarlo;
 - evidencia inmutable por snapshot, vencimiento a 62 días del corte y supresión de ausentes;
 - una reaparición sólo revierte una supresión automática si nadie moderó la fila mientras estuvo
   ausente; `DISABLED` y `UNDER_REVIEW` nunca son reactivados por el scheduler;
