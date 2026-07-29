@@ -21,7 +21,7 @@ forman parte del repositorio ni quedan cubiertos por su licencia.
 
 ## Stack
 
-- Node.js 24 y TypeScript 6 en modo estricto.
+- Node.js 22/24 LTS y TypeScript 6 en modo estricto.
 - pnpm workspaces.
 - NestJS 11 con Fastify 5.
 - OpenAPI 3.0 generado y referencia interactiva Scalar.
@@ -115,7 +115,7 @@ domain          <- application <- presentation
 
 ## Requisitos
 
-- Node.js 24.15 o superior dentro de la rama 24.
+- Node.js 22.14 o superior dentro de la rama 22, o Node.js 24.15 o superior dentro de la rama 24.
 - Corepack.
 - Docker para PostgreSQL local y tests de integración.
 
@@ -129,10 +129,18 @@ Copy-Item .env.example .env
 corepack pnpm infra:up
 corepack pnpm db:migrate:catalog
 corepack pnpm db:seed:catalog
+corepack pnpm db:migrate:owner-research
 corepack pnpm dev:public-query
 ```
 
 En Bash, reemplace `Copy-Item .env.example .env` por `cp .env.example .env`.
+
+`db:migrate:owner-research` es el único punto de entrada para ese esquema. Bajo un advisory lock y
+una sola transacción valida los hashes inmutables, aplica la baseline `0006` tanto sobre un esquema
+nuevo como sobre uno preexistente sin ledger, crea `research_private.schema_migration`, registra la
+baseline y luego aplica `0007`. Si el ledger ya existe, verifica los hashes registrados y ejecuta
+sólo las entradas faltantes. `db:verify:owner-research` exige que baseline y migraciones gestionadas
+estén registradas con los hashes del manifiesto.
 
 Con `API_DOCUMENTATION_ENABLED=true`, la documentación queda en:
 
@@ -141,9 +149,22 @@ Con `API_DOCUMENTATION_ENABLED=true`, la documentación queda en:
 - `http://localhost:3001/.well-known/api-catalog`
 - `http://localhost:3001/rsd.xml`
 
+Todas esas superficies, igual que `/v1/**`, requieren autenticación owner. El hash incluido en
+`.env.example` corresponde únicamente a la clave local descartable
+`change-me-local-owner-api-key`; reemplácela antes de compartir o desplegar el servicio. Por
+ejemplo:
+
+```bash
+curl -u 'owner:change-me-local-owner-api-key' http://localhost:3001/docs
+curl -H 'X-API-Key: change-me-local-owner-api-key' http://localhost:3001/v1/professionals
+```
+
+`GET /health/live` y `GET /health/ready` permanecen públicos para el supervisor del proceso y el
+balanceador.
+
 `/openapi.json` es el contrato canónico. Scalar solo lo presenta; el catálogo well-known implementa
 descubrimiento REST moderno y `rsd.xml` conserva compatibilidad con el RSD solicitado sin anunciar
-APIs de blogs inexistentes. Consulte [la guía de API pública](./docs/PUBLIC_API.md).
+APIs de blogs inexistentes. Consulte [la guía de API privada](./docs/PUBLIC_API.md).
 
 Endpoints iniciales:
 
@@ -153,6 +174,7 @@ GET /health/ready
 GET /v1/professionals?q=ana&limit=20&cursor=<opaco>
 GET /v1/professionals/:idOrSlug
 GET /v1/professionals/:professionalId/credentials
+GET /v1/professionals/:idOrSlug/research
 ```
 
 La paginación usa cursor opaco y orden estable. El adaptador sólo consulta las vistas públicas:
@@ -160,6 +182,12 @@ un perfil debe tener visibilidad `PUBLIC`; además, su fuente, finalidad, reutil
 deben estar aprobadas y vigentes. Los slugs históricos resuelven al slug público actual. El detalle
 incluye la evidencia que sostiene el nombre y el endpoint de credenciales devuelve únicamente
 títulos `ENABLED`, cada uno con evidencia independiente.
+
+El endpoint `research` es owner-only y entrega los candidatos privados del último análisis sin
+convertirlos en hechos: conserva fuentes, fechas, horarios, especialidades declaradas por la
+institución, método de coincidencia, índice de flexibilidad, alertas y decisiones de revisión. La
+respuesta elimina identificadores HMAC, rutas y hashes internos. Los horarios no representan
+disponibilidad de turnos y las especialidades de una mutualista no sustituyen los títulos MSP.
 
 Para detener la infraestructura:
 
@@ -174,22 +202,37 @@ arrancar y termina inmediatamente ante valores inválidos.
 
 Variables principales:
 
-| Variable                         | Proceso     | Propósito                                      |
-| -------------------------------- | ----------- | ---------------------------------------------- |
-| `CATALOG_DATABASE_URL`           | query API   | rol lector limitado a vistas públicas          |
-| `CATALOG_MIGRATION_DATABASE_URL` | migraciones | propietario con permisos DDL                   |
-| `CATALOG_SEED_DATABASE_URL`      | seed local  | escritor de fixtures sintéticos                |
-| `CATALOG_DATABASE_POOL_MAX`      | query API   | máximo del pool                                |
-| `CATALOG_DATABASE_SSL`           | query API   | TLS con certificado verificado                 |
-| `ALLOW_SYNTHETIC_SEED`           | seed local  | confirmación explícita; nunca habilita prod    |
-| `CORS_ORIGINS`                   | APIs        | hasta 20 orígenes HTTP(S), separados por comas |
-| `API_DOCUMENTATION_ENABLED`      | query API   | expone OpenAPI, Scalar y discovery             |
-| `PUBLIC_API_BASE_URL`            | query API   | origen canónico usado en contratos y links     |
-| `HTTP_RATE_LIMIT_MAX`            | APIs        | solicitudes por ventana                        |
-| `HTTP_RATE_LIMIT_WINDOW`         | APIs        | ventana de rate limit                          |
+| Variable                           | Proceso     | Propósito                                      |
+| ---------------------------------- | ----------- | ---------------------------------------------- |
+| `CATALOG_DATABASE_URL`             | query API   | rol lector limitado a vistas públicas          |
+| `CATALOG_MIGRATION_DATABASE_URL`   | migraciones | propietario con permisos DDL                   |
+| `CATALOG_SEED_DATABASE_URL`        | seed local  | escritor de fixtures sintéticos                |
+| `CATALOG_DATABASE_POOL_MAX`        | query API   | máximo del pool                                |
+| `CATALOG_DATABASE_SSL`             | query API   | TLS con certificado verificado                 |
+| `OWNER_RESEARCH_DATABASE_URL`      | query API   | rol lector para la vista de dossiers owner     |
+| `OWNER_RESEARCH_DATABASE_POOL_MAX` | query API   | máximo del pool privado de sólo lectura        |
+| `ALLOW_SYNTHETIC_SEED`             | seed local  | confirmación explícita; nunca habilita prod    |
+| `CORS_ORIGINS`                     | APIs        | hasta 20 orígenes HTTP(S), separados por comas |
+| `API_DOCUMENTATION_ENABLED`        | query API   | expone OpenAPI, Scalar y discovery             |
+| `PUBLIC_API_BASE_URL`              | query API   | origen canónico usado en contratos y links     |
+| `HTTP_RATE_LIMIT_MAX`              | APIs        | solicitudes por ventana                        |
+| `HTTP_RATE_LIMIT_WINDOW`           | APIs        | ventana de rate limit                          |
+| `OWNER_API_KEY_SHA256`             | APIs        | SHA-256 hexadecimal de la clave owner          |
+| `OWNER_API_BASIC_USERNAME`         | query API   | usuario Basic; `owner` por defecto             |
+| `FIREBASE_PROJECT_ID`              | APIs        | proyecto para validar Firebase ID tokens       |
+| `FIREBASE_OWNER_UIDS`              | APIs        | allowlist CSV de UID owner                     |
 
 `SWAGGER_ENABLED` se acepta como alias de transición. En producción, habilitar la documentación
 obliga a declarar `PUBLIC_API_BASE_URL`; el servicio no confía en `Host` para construir URLs.
+
+El arranque es fail-closed: se debe configurar `OWNER_API_KEY_SHA256`, o bien el par
+`FIREBASE_PROJECT_ID` + `FIREBASE_OWNER_UIDS`. La clave en texto plano nunca se guarda en la
+configuración. `X-API-Key` y, exclusivamente en `public-query-api`, Basic
+(`OWNER_API_BASIC_USERNAME:<clave>`) comparan la clave recibida contra el hash mediante una
+comparación de tiempo constante. `command-api` acepta API key o Firebase, pero nunca Basic.
+Firebase Admin usa Application Default Credentials —por ejemplo `GOOGLE_APPLICATION_CREDENTIALS`—,
+valida el proyecto y la firma, comprueba revocación y exige que `uid` esté en la allowlist. Si se
+configuran ambos mecanismos, cualquiera de ellos puede autenticar al owner.
 
 El límite HTTP de cuerpo es deliberadamente fijo en 1 MiB en esta etapa. Los secretos, tokens,
 cookies, parámetros de búsqueda y cabeceras de App Check quedan fuera de los logs. Cada solicitud
@@ -363,7 +406,7 @@ Firebase autentica una cuenta; no verifica una consulta médica ni la veracidad 
 ## Documentación
 
 - [Arquitectura completa](./BACKEND_ARCHITECTURE.md)
-- [Contrato y descubrimiento de la API pública](./docs/PUBLIC_API.md)
+- [Contrato y descubrimiento de la API privada](./docs/PUBLIC_API.md)
 - [Configuración segura de PostgreSQL](./docs/POSTGRES_CONFIGURATION.md)
 - [Operación de la actualización diaria](./docs/OPERATIONS_DAILY_REFRESH.md)
 - [Ingesta de fuentes públicas](./docs/DATA_INGESTION.md)

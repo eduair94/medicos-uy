@@ -12,6 +12,7 @@
     "@medicos/http": "workspace:*",
     "@medicos/observability": "workspace:*",
     "@medicos/professionals": "workspace:*",
+    "@medicos/research": "workspace:*",
     "@nestjs/common": "catalog:",
     "@nestjs/config": "catalog:",
     "@nestjs/core": "catalog:",

@@ -16,6 +16,8 @@ const workspaceAliases = {
   '@medicos/professionals': resolve(__dirname, 'packages/modules/professionals/src/index.ts'),
   '@medicos/provenance/nest': resolve(__dirname, 'packages/modules/provenance/src/nest.ts'),
   '@medicos/provenance': resolve(__dirname, 'packages/modules/provenance/src/index.ts'),
+  '@medicos/research/nest': resolve(__dirname, 'packages/modules/research/src/nest.ts'),
+  '@medicos/research': resolve(__dirname, 'packages/modules/research/src/index.ts'),
   '@medicos/worker': resolve(__dirname, 'packages/platform/worker/src/index.ts'),
 };
 

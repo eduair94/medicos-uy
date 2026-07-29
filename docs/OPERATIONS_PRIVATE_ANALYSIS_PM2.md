@@ -1,7 +1,7 @@
 # Análisis privado completo con PM2
 
-La misma definición PM2 también ejecuta la API pública de solo lectura como
-`medicos-public-query-api`. Su archivo de entorno es
+La misma definición PM2 también ejecuta la API privada de consulta, cuyo nombre interno histórico
+es `medicos-public-query-api`. Su archivo de entorno es
 `/etc/medicos-backend/public-query-api.env` (`root:root`, modo `0600`) y el proceso exige
 `PUBLIC_QUERY_API_HOST=127.0.0.1` para quedar accesible únicamente mediante el origen local del
 túnel:
@@ -15,10 +15,11 @@ en `/docs`, el contrato en `/openapi.json`, el catálogo en `/.well-known/api-ca
 `/rsd.xml`.
 
 Este proceso ejecuta dos etapas fail-fast. Primero construye y persiste el análisis interno de
-todos los profesionales del snapshot MSP seleccionado. Si esa etapa termina correctamente, proyecta
-al catálogo público **únicamente** nombre y títulos oficiales de Infotítulos, con evidencia,
-claims, vigencia y rutas estables. No publica candidatos, agendas, noticias, sanciones ni resultados
-del análisis privado; tampoco confirma identidades a partir de coincidencias flexibles.
+todos los profesionales del snapshot MSP seleccionado. Si esa etapa termina correctamente,
+proyecta al catálogo factual **únicamente** nombre y títulos oficiales de Infotítulos, con
+evidencia, claims, vigencia y rutas estables. El endpoint owner `research` lee aparte el dossier
+privado autenticado y conserva candidatos, agendas, referencias y decisiones sin convertirlas en
+hechos confirmados.
 
 PM2 mantiene un único scheduler vivo. El proceso ejecuta el batch una vez al iniciar o reiniciar y
 luego queda inactivo. `cron_restart` lo reinicia diariamente a las **06:37 UTC**, equivalentes a
@@ -70,6 +71,67 @@ sudo install -o root -g root -m 0600 \
   deployment/pm2/private-analysis.env.example \
   /etc/medicos-backend/private-analysis.env
 ```
+
+Antes de instalar el entorno de la API, genere una clave owner de alta entropía en un archivo
+externo. No la agregue al repositorio ni a la línea de comandos del proceso:
+
+```bash
+umask 077
+if [ ! -s /etc/medicos-backend/owner-api-key ]; then
+  openssl rand -base64 48 | tr -d '\n' > /etc/medicos-backend/owner-api-key
+fi
+chown root:root /etc/medicos-backend/owner-api-key
+chmod 0600 /etc/medicos-backend/owner-api-key
+```
+
+`install-public-query-environment.cjs` lee esa clave, guarda únicamente su SHA-256 en
+`public-query-api.env` y configura `OWNER_RESEARCH_DATABASE_URL` con el rol lector. Para recuperar
+la clave desde un equipo autorizado use un canal SSH; no la copie a logs o tickets:
+
+```bash
+ssh gsearch 'cat /etc/medicos-backend/owner-api-key'
+```
+
+En una instalación existente, aprovisione o normalice primero los roles owner con una conexión
+administrativa. El script toma la contraseña desde el ambiente, no desde argumentos SQL:
+
+```bash
+export MEDICOS_OWNER_RESEARCH_QUERY_PASSWORD="$(cat /ruta/segura/owner-research-db-password)"
+psql "$POSTGRES_ADMIN_URL" \
+  --set=ON_ERROR_STOP=1 \
+  --file deployment/postgres/provision-owner-research-roles.sql
+unset MEDICOS_OWNER_RESEARCH_QUERY_PASSWORD POSTGRES_ADMIN_URL
+```
+
+Restrinja además `pg_hba.conf` al origen real del API, a la base exacta, TLS y SCRAM; no habilite
+un CIDR global. Por ejemplo, si API y PostgreSQL comparten host:
+
+```text
+hostssl medicos_catalog medicos_owner_research_query 127.0.0.1/32 scram-sha-256
+```
+
+Recargue PostgreSQL después de cambiar HBA y compruebe la conexión con el rol lector. En Docker
+local, el init crea y normaliza `medicos_migrator` como rol `NOLOGIN` sin secreto; el superusuario
+local definido por `CATALOG_MIGRATION_DATABASE_URL` ejecuta las migraciones.
+
+Antes de activar una versión que incluya el endpoint owner, configure
+`CATALOG_MIGRATION_DATABASE_URL` con una identidad autorizada para DDL y ejecute el único runner
+versionado:
+
+```bash
+corepack pnpm db:migrate:owner-research
+corepack pnpm db:verify:owner-research
+```
+
+El comando `db:migrate:owner-research` no presupone una instalación manual de `0006`. Valida el
+manifiesto y los SHA-256 inmutables y, bajo el mismo advisory lock y transacción, ejecuta la
+baseline verificada si no existe ledger, crea `research_private.schema_migration`, registra `0006`
+y luego ejecuta/registra `0007`. Esto funciona tanto en un esquema nuevo como en uno preexistente
+sin ledger. Si el ledger ya existe, verifica cada hash y aplica sólo entradas faltantes; un hash
+distinto aborta y revierte. `db:verify:owner-research` no crea nada y exige las entradas y hashes de
+baseline y gestionadas. `0007` crea una vista `security_barrier` y concede al lector sólo `USAGE`
+del esquema, `EXECUTE` de la función sanitizadora pura y `SELECT` de esa vista; no concede acceso a
+las tablas privadas.
 
 Complete `/etc/medicos-backend/private-analysis.env` sin cambiar propietario ni modo. Fije
 `PROFESSIONAL_ANALYSIS_EXPECTED_SNAPSHOT_ID` al snapshot ya importado, y configure la CA y el DNS
@@ -171,6 +233,19 @@ SELECT count(*) FROM catalog.public_professional;
 SELECT count(*) FROM catalog.public_professional_route WHERE route_kind = 'CURRENT';
 SELECT count(*) FROM credentials.public_registered_title;
 SELECT count(*) FROM provenance.public_evidence_ref;
+```
+
+La API debe rechazar una consulta anónima y aceptar la misma consulta con la clave owner:
+
+```bash
+test "$(curl -sS -o /dev/null -w '%{http_code}' \
+  https://medicos-api.checkleaked.cc/v1/professionals)" = 401
+
+OWNER_API_KEY="$(ssh gsearch 'cat /etc/medicos-backend/owner-api-key')"
+curl --fail --silent --show-error \
+  -H "X-API-Key: ${OWNER_API_KEY}" \
+  https://medicos-api.checkleaked.cc/v1/professionals/1a8c34f4-9097-4d86-b670-e609c22e9683/research
+unset OWNER_API_KEY
 ```
 
 Los totales terminales deben reconciliar con el número de perfiles del snapshot privado. Revise

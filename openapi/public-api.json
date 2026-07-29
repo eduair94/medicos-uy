@@ -14,7 +14,8 @@
           }
         },
         "summary": "Check whether the process is alive",
-        "tags": ["health"]
+        "tags": ["health"],
+        "security": []
       }
     },
     "/health/ready": {
@@ -38,7 +39,8 @@
           }
         },
         "summary": "Check whether required dependencies are ready",
-        "tags": ["health"]
+        "tags": ["health"],
+        "security": []
       }
     },
     "/v1/professionals": {
@@ -78,6 +80,14 @@
           },
           "400": {
             "description": "Los parámetros de búsqueda no son válidos.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "401": {
+            "description": "Owner authentication is required.",
             "content": {
               "application/problem+json": {
                 "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
@@ -129,6 +139,14 @@
           },
           "400": {
             "description": "El identificador no es válido.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "401": {
+            "description": "Owner authentication is required.",
             "content": {
               "application/problem+json": {
                 "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
@@ -194,6 +212,14 @@
               }
             }
           },
+          "401": {
+            "description": "Owner authentication is required.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
           "404": {
             "description": "No hay títulos publicables para el profesional.",
             "content": {
@@ -222,11 +248,78 @@
         "summary": "Get registered titles for one public professional",
         "tags": ["credentials"]
       }
+    },
+    "/v1/professionals/{idOrSlug}/research": {
+      "get": {
+        "description": "Devuelve el dossier privado más reciente sin convertir coincidencias nominales en hechos. Conserva método e índice de flexibilidad, decisiones de identidad/hecho, alertas, fuentes y fechas; omite IDs HMAC, rutas de archivos y hashes internos.",
+        "operationId": "getOwnerProfessionalResearch",
+        "parameters": [
+          {
+            "name": "idOrSlug",
+            "required": true,
+            "in": "path",
+            "description": "UUID público o slug actual/histórico del profesional.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registro oficial del MSP y candidatos institucionales, horarios observados, referencias web y cobertura del análisis.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OwnerProfessionalResearchResponseDto" }
+              }
+            }
+          },
+          "400": {
+            "description": "El identificador no es válido.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "401": {
+            "description": "Owner authentication is required.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe un dossier privado vigente para el profesional.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "429": {
+            "description": "Se superó el límite de solicitudes.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno o dossier persistido incompatible, sin detalles sensibles.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          }
+        },
+        "summary": "Get the latest owner-only research dossier for one professional",
+        "tags": ["owner research"]
+      }
     }
   },
   "info": {
     "title": "Directorio Médico Uruguay",
-    "description": "API pública, de solo lectura, del directorio médico uruguayo. Los datos pueden estar desactualizados y deben verificarse en su fuente oficial.",
+    "description": "API privada, de solo lectura, del directorio médico uruguayo. Los datos y candidatos pueden estar desactualizados y deben verificarse en su fuente original.",
     "version": "1.0.0",
     "contact": {
       "name": "Proyecto Directorio Médico Uruguay",
@@ -240,9 +333,22 @@
     { "name": "credentials", "description": "Títulos habilitantes publicados con evidencia" }
   ],
   "servers": [
-    { "url": "https://api.example.invalid", "description": "Servidor público configurado" }
+    { "url": "https://api.example.invalid", "description": "Servidor privado configurado" }
   ],
   "components": {
+    "securitySchemes": {
+      "ownerBasic": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Acceso owner para navegador. Usa el usuario configurado y la misma clave privada que X-API-Key."
+      },
+      "ownerApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Clave owner privada; el servidor conserva solamente su SHA-256."
+      }
+    },
     "schemas": {
       "HealthCheck": {
         "type": "object",
@@ -394,11 +500,693 @@
           }
         },
         "required": ["professionalId", "registeredTitles"]
+      },
+      "OwnerResearchCountsResponseDto": {
+        "type": "object",
+        "properties": {
+          "candidates": { "type": "number" },
+          "officialRegistryRecords": { "type": "number" },
+          "institutionalCandidates": { "type": "number" },
+          "schedules": { "type": "number" },
+          "webCandidates": { "type": "number" },
+          "publicReferenceCandidates": { "type": "number" },
+          "ethicsCandidates": { "type": "number" }
+        },
+        "required": [
+          "candidates",
+          "officialRegistryRecords",
+          "institutionalCandidates",
+          "schedules",
+          "webCandidates",
+          "publicReferenceCandidates",
+          "ethicsCandidates"
+        ]
+      },
+      "OwnerResearchNoticeResponseDto": {
+        "type": "object",
+        "properties": {
+          "associationsAreUnconfirmedCandidates": { "type": "boolean", "enum": [true] },
+          "sourceDeclaredSpecialtyIsNotMspCredential": { "type": "boolean", "enum": [true] },
+          "publishedScheduleIsNotRealtimeAvailability": { "type": "boolean", "enum": [true] },
+          "absenceOfFindingsDoesNotProveAbsence": { "type": "boolean", "enum": [true] },
+          "verifyWithOriginalSource": { "type": "boolean", "enum": [true] },
+          "text": { "type": "string" }
+        },
+        "required": [
+          "associationsAreUnconfirmedCandidates",
+          "sourceDeclaredSpecialtyIsNotMspCredential",
+          "publishedScheduleIsNotRealtimeAvailability",
+          "absenceOfFindingsDoesNotProveAbsence",
+          "verifyWithOriginalSource",
+          "text"
+        ]
+      },
+      "OwnerResearchQueryResponseDto": {
+        "type": "object",
+        "properties": {
+          "mode": { "type": "string", "enum": ["NAME", "OPAQUE_MSP_ID"] },
+          "selectionRule": { "type": "string", "enum": ["ALL_BEST_LOOSENESS_MATCHES"] },
+          "bestFlexibilityIndex": { "type": "number", "enum": [0, 1, 2], "nullable": true },
+          "ambiguity": { "type": "string", "enum": ["NONE", "MULTIPLE_CANDIDATES", "NO_CANDIDATE"] }
+        },
+        "required": ["mode", "selectionRule", "bestFlexibilityIndex", "ambiguity"]
+      },
+      "OfficialTitleResponseDto": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "temporaryRegistration": { "type": "object", "nullable": true }
+        },
+        "required": ["title", "temporaryRegistration"]
+      },
+      "OfficialProvenanceResponseDto": {
+        "type": "object",
+        "properties": {
+          "publisher": { "type": "string" },
+          "dataset": { "type": "string" },
+          "sourceCutoffDate": { "type": "string" }
+        },
+        "required": ["publisher", "dataset", "sourceCutoffDate"]
+      },
+      "OfficialProfessionalResponseDto": {
+        "type": "object",
+        "properties": {
+          "fullName": { "type": "string" },
+          "enabledTitles": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OfficialTitleResponseDto" }
+          },
+          "provenance": { "$ref": "#/components/schemas/OfficialProvenanceResponseDto" }
+        },
+        "required": ["fullName", "enabledTitles", "provenance"]
+      },
+      "ResearchNameMatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EXACT_NORMALIZED_NAME",
+              "EXACT_TOKEN_MULTISET",
+              "PARTIAL_TOKEN_SUBSET",
+              "INITIALS_TOKEN_SUBSEQUENCE"
+            ]
+          },
+          "flexibilityIndex": {
+            "type": "number",
+            "description": "Índice de flexibilidad del algoritmo: 0 exacto, 1 nombre parcial, 2 iniciales/abreviación. No es una probabilidad.",
+            "enum": [0, 1, 2]
+          },
+          "canonicalTokenCount": { "type": "number" },
+          "observedTokenCount": { "type": "number" },
+          "exactObservedTokenCount": { "type": "number" },
+          "initialObservedTokenCount": { "type": "number" },
+          "meaning": { "type": "string", "enum": ["LOOSENESS_NOT_IDENTITY_CONFIDENCE"] }
+        },
+        "required": [
+          "kind",
+          "flexibilityIndex",
+          "canonicalTokenCount",
+          "observedTokenCount",
+          "exactObservedTokenCount",
+          "initialObservedTokenCount",
+          "meaning"
+        ]
+      },
+      "InstitutionalProviderIdentityResponseDto": {
+        "type": "object",
+        "properties": {
+          "institution": { "type": "string" },
+          "basis": {
+            "type": "string",
+            "enum": ["institution_and_exact_name", "source_professional_id"]
+          },
+          "sourceProfessionalId": { "type": "object", "nullable": true },
+          "normalizedName": { "type": "string" }
+        },
+        "required": ["institution", "basis", "sourceProfessionalId", "normalizedName"]
+      },
+      "ResearchScheduleSourceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "institution": { "type": "string" },
+          "url": { "type": "string", "format": "uri" }
+        },
+        "required": ["id", "institution", "url"]
+      },
+      "ResearchScheduleVenueResponseDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "object" },
+          "address": { "type": "object" },
+          "phone": { "type": "object" },
+          "dependency": { "type": "object" }
+        }
+      },
+      "WeeklyScheduleEntryResponseDto": {
+        "type": "object",
+        "properties": {
+          "dayOfWeek": { "type": "string" },
+          "sourceLabel": { "type": "string" },
+          "value": { "type": "string" }
+        },
+        "required": ["dayOfWeek", "sourceLabel", "value"]
+      },
+      "ResearchScheduleResponseDto": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": { "type": "number", "enum": [1] },
+          "recordId": { "type": "string" },
+          "source": { "$ref": "#/components/schemas/ResearchScheduleSourceResponseDto" },
+          "observedAt": { "type": "string", "format": "date-time" },
+          "scheduleType": { "type": "string", "enum": ["published_consultation_roster"] },
+          "appointmentAvailability": {
+            "type": "string",
+            "description": "El crawler no observa cupos ni disponibilidad de agenda en tiempo real.",
+            "enum": ["not_observed"]
+          },
+          "sourceProfessionalId": { "type": "string" },
+          "sourceProfessionalLabel": { "type": "string" },
+          "professionalName": { "type": "string" },
+          "specialty": { "type": "string" },
+          "venue": { "$ref": "#/components/schemas/ResearchScheduleVenueResponseDto" },
+          "weeklySchedule": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/WeeklyScheduleEntryResponseDto" }
+          },
+          "frequency": { "type": "object" },
+          "notes": { "type": "object" }
+        },
+        "required": [
+          "schemaVersion",
+          "recordId",
+          "source",
+          "observedAt",
+          "scheduleType",
+          "appointmentAvailability",
+          "sourceProfessionalId",
+          "sourceProfessionalLabel",
+          "professionalName",
+          "specialty",
+          "venue",
+          "weeklySchedule"
+        ]
+      },
+      "UnresolvedSourceRecordResponseDto": {
+        "type": "object",
+        "properties": { "recordId": { "type": "string" } },
+        "required": ["recordId"]
+      },
+      "InstitutionalCandidateResponseDto": {
+        "type": "object",
+        "properties": {
+          "candidateId": { "type": "string" },
+          "institution": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ambiguous_exact_name",
+              "exact_name_and_title_consistent",
+              "exact_name_only",
+              "unmatched"
+            ]
+          },
+          "providerIdentity": {
+            "$ref": "#/components/schemas/InstitutionalProviderIdentityResponseDto"
+          },
+          "sourceDisplayNames": { "type": "array", "items": { "type": "string" } },
+          "sourceSpecialties": { "type": "array", "items": { "type": "string" } },
+          "identityEvidence": { "type": "array", "items": { "type": "string" } },
+          "schedules": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ResearchScheduleResponseDto" }
+          },
+          "unresolvedSourceRecords": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/UnresolvedSourceRecordResponseDto" }
+          },
+          "identityConfirmed": { "type": "boolean" },
+          "linkageDecision": { "type": "string", "enum": ["NOT_LINKED", "LINKED"] },
+          "publicationDecision": { "type": "string", "enum": ["NOT_PUBLISHED", "PUBLISHED"] },
+          "requiresHumanReview": { "type": "boolean" },
+          "alerts": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "candidateId",
+          "institution",
+          "status",
+          "providerIdentity",
+          "sourceDisplayNames",
+          "sourceSpecialties",
+          "identityEvidence",
+          "schedules",
+          "unresolvedSourceRecords",
+          "identityConfirmed",
+          "linkageDecision",
+          "publicationDecision",
+          "requiresHumanReview",
+          "alerts"
+        ]
+      },
+      "WebCandidateSubjectResponseDto": {
+        "type": "object",
+        "properties": { "displayName": { "type": "string" } },
+        "required": ["displayName"]
+      },
+      "WebCandidateClaimResponseDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "ACADEMIC_MENTION",
+              "INSTITUTIONAL_DIRECTORY_MENTION",
+              "OFFICIAL_PUBLICATION_MENTION",
+              "PROFESSIONAL_DIRECTORY_PROFILE"
+            ]
+          },
+          "sourceId": { "type": "string" },
+          "publisher": { "type": "string" }
+        },
+        "required": ["category", "sourceId", "publisher"]
+      },
+      "WebCandidateMatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["EXACT_NORMALIZED_NAME", "PARTIAL_TOKEN_SUBSET", "INITIALS_TOKEN_SUBSEQUENCE"]
+          },
+          "flexibilityIndex": { "type": "number", "enum": [0, 1, 2] },
+          "meaning": { "type": "string", "enum": ["LOOSENESS_NOT_IDENTITY_CONFIDENCE"] },
+          "ambiguity": { "type": "string", "enum": ["NONE", "HOMONYM"] },
+          "alerts": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["kind", "flexibilityIndex", "meaning", "ambiguity", "alerts"]
+      },
+      "WebCandidateProvenanceResponseDto": {
+        "type": "object",
+        "properties": {
+          "canonicalUrl": { "type": "string", "format": "uri" },
+          "retrievedAt": { "type": "string", "format": "date-time" },
+          "transport": { "type": "string", "enum": ["CRAWL4AI", "DIRECT_FETCH"] }
+        },
+        "required": ["canonicalUrl", "retrievedAt", "transport"]
+      },
+      "WebLinkageDecisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["NOT_LINKED"] },
+          "identityConfirmed": { "type": "boolean" }
+        },
+        "required": ["decision", "identityConfirmed"]
+      },
+      "WebFactDecisionResponseDto": {
+        "type": "object",
+        "properties": { "factConfirmed": { "type": "boolean" } },
+        "required": ["factConfirmed"]
+      },
+      "WebPublicationDecisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["NOT_PUBLISHED"] },
+          "destination": { "type": "string", "enum": ["INTERNAL_QUARANTINE_ONLY"] },
+          "publicExportAllowed": { "type": "boolean" }
+        },
+        "required": ["decision", "destination", "publicExportAllowed"]
+      },
+      "WebCandidateRetentionResponseDto": {
+        "type": "object",
+        "properties": {
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "disposition": { "type": "string", "enum": ["DELETE_OR_REVALIDATE"] }
+        },
+        "required": ["expiresAt", "disposition"]
+      },
+      "WebCandidateResponseDto": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": { "type": "number", "enum": [1] },
+          "candidateId": { "type": "string" },
+          "state": { "type": "string", "enum": ["NEEDS_HUMAN_REVIEW"] },
+          "quarantine": { "type": "boolean" },
+          "subject": { "$ref": "#/components/schemas/WebCandidateSubjectResponseDto" },
+          "claim": { "$ref": "#/components/schemas/WebCandidateClaimResponseDto" },
+          "match": { "$ref": "#/components/schemas/WebCandidateMatchResponseDto" },
+          "provenance": { "$ref": "#/components/schemas/WebCandidateProvenanceResponseDto" },
+          "linkageDecision": { "$ref": "#/components/schemas/WebLinkageDecisionResponseDto" },
+          "factDecision": { "$ref": "#/components/schemas/WebFactDecisionResponseDto" },
+          "publicationDecision": {
+            "$ref": "#/components/schemas/WebPublicationDecisionResponseDto"
+          },
+          "retention": { "$ref": "#/components/schemas/WebCandidateRetentionResponseDto" }
+        },
+        "required": [
+          "schemaVersion",
+          "candidateId",
+          "state",
+          "quarantine",
+          "subject",
+          "claim",
+          "match",
+          "provenance",
+          "linkageDecision",
+          "factDecision",
+          "publicationDecision",
+          "retention"
+        ]
+      },
+      "PublicReferenceClaimResponseDto": {
+        "type": "object",
+        "properties": {
+          "relationship": {
+            "type": "string",
+            "enum": [
+              "MEDICAL_STUDENT_PRESENTATION",
+              "ACADEMIC_RESEARCH_COAUTHOR",
+              "SPECIALTY_MONOGRAPH_POSTER_COAUTHOR",
+              "RESEARCH_PROJECT_APPROVAL_CONTEXT"
+            ]
+          },
+          "factualSummary": { "type": "string" },
+          "institutionContext": { "type": "array", "items": { "type": "string" } },
+          "doesNotEstablish": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["relationship", "factualSummary", "institutionContext", "doesNotEstablish"]
+      },
+      "PublicReferenceAccessResponseDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "ALLOWLISTED_PUBLIC_PAGE",
+              "PUBLIC_METADATA_ONLY",
+              "USER_OR_RESEARCHER_SUPPLIED_URL_NO_FETCH",
+              "OFFICIAL_CONTEXT_DOCUMENT"
+            ]
+          },
+          "automatedFetchAllowed": { "type": "boolean" },
+          "contentStored": { "type": "boolean" },
+          "rightsNote": { "type": "string" }
+        },
+        "required": ["mode", "automatedFetchAllowed", "contentStored", "rightsNote"]
+      },
+      "PublicReferenceDecisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "identityConfirmed": { "type": "boolean" },
+          "factConfirmed": { "type": "boolean" },
+          "linkageDecision": { "type": "string", "enum": ["NOT_LINKED", "LINKED"] },
+          "publicationDecision": { "type": "string", "enum": ["NOT_PUBLISHED", "PUBLISHED"] },
+          "publicExportAllowed": { "type": "boolean" },
+          "requiresHumanReview": { "type": "boolean" }
+        },
+        "required": [
+          "identityConfirmed",
+          "factConfirmed",
+          "linkageDecision",
+          "publicationDecision",
+          "publicExportAllowed",
+          "requiresHumanReview"
+        ]
+      },
+      "PublicReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": { "type": "number", "enum": [1] },
+          "referenceId": { "type": "string" },
+          "referenceKind": {
+            "type": "string",
+            "enum": [
+              "CRAWLED_SOURCE_METADATA",
+              "PUBLIC_METADATA_REFERENCE",
+              "MANUAL_REFERENCE_NO_AUTOMATED_FETCH",
+              "CONTEXT_CORROBORATION_ONLY"
+            ]
+          },
+          "publisher": { "type": "string" },
+          "canonicalUrl": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "sourceDate": { "type": "string" },
+          "sourceDatePrecision": { "type": "string", "enum": ["DAY", "MONTH", "YEAR"] },
+          "observedNames": { "type": "array", "items": { "type": "string" } },
+          "claim": { "$ref": "#/components/schemas/PublicReferenceClaimResponseDto" },
+          "access": { "$ref": "#/components/schemas/PublicReferenceAccessResponseDto" },
+          "corroboratesReferenceIds": { "type": "array", "items": { "type": "string" } },
+          "decision": { "$ref": "#/components/schemas/PublicReferenceDecisionResponseDto" }
+        },
+        "required": [
+          "schemaVersion",
+          "referenceId",
+          "referenceKind",
+          "publisher",
+          "canonicalUrl",
+          "title",
+          "sourceDate",
+          "sourceDatePrecision",
+          "observedNames",
+          "claim",
+          "access",
+          "corroboratesReferenceIds",
+          "decision"
+        ]
+      },
+      "PublicReferenceCandidateResponseDto": {
+        "type": "object",
+        "properties": {
+          "reference": { "$ref": "#/components/schemas/PublicReferenceResponseDto" },
+          "nameMatch": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [{ "$ref": "#/components/schemas/ResearchNameMatchResponseDto" }]
+          },
+          "connection": {
+            "type": "string",
+            "enum": ["DIRECT_NAME_CANDIDATE", "CORROBORATES_MATCHED_REFERENCE_CONTEXT_ONLY"]
+          },
+          "alerts": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["reference", "nameMatch", "connection", "alerts"]
+      },
+      "SourceCoverageResponseDto": {
+        "type": "object",
+        "properties": {
+          "sourceId": { "type": "string" },
+          "publisher": { "type": "string" },
+          "sourceUrl": { "type": "string", "format": "uri" },
+          "category": { "type": "string", "enum": ["PROFESSIONAL_ETHICS_RULINGS"] },
+          "status": {
+            "type": "string",
+            "enum": ["SOURCE_BLOCKED_ROBOTS", "AUTHORIZED_FETCH_NOT_CONFIGURED", "CHECKED"]
+          },
+          "policyReviewedAt": { "type": "string", "format": "date-time" },
+          "automatedFetchPerformed": { "type": "boolean" },
+          "namedMatchStatus": {
+            "type": "string",
+            "enum": [
+              "NOT_CHECKED_DUE_TO_AUTOMATION_PROHIBITED",
+              "NO_NAMED_MATCH_IN_CURRENT_VISIBLE_INDEX",
+              "CANDIDATE_REQUIRES_HUMAN_REVIEW"
+            ]
+          },
+          "noFindingProvesAbsence": { "type": "boolean" },
+          "identityDecision": { "type": "string", "enum": ["NOT_LINKED", "LINKED"] },
+          "publicationDecision": { "type": "string", "enum": ["NOT_PUBLISHED", "PUBLISHED"] },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "sourceId",
+          "publisher",
+          "sourceUrl",
+          "category",
+          "status",
+          "policyReviewedAt",
+          "automatedFetchPerformed",
+          "namedMatchStatus",
+          "noFindingProvesAbsence",
+          "identityDecision",
+          "publicationDecision",
+          "warnings"
+        ]
+      },
+      "ResearchSignalSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "officialRegistryRecords": { "type": "number" },
+          "institutionalCandidates": { "type": "number" },
+          "scheduleRecords": { "type": "number" },
+          "webCandidates": { "type": "number" },
+          "publicReferenceCandidates": { "type": "number" },
+          "publishers": { "type": "array", "items": { "type": "string" } },
+          "institutionContexts": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "officialRegistryRecords",
+          "institutionalCandidates",
+          "scheduleRecords",
+          "webCandidates",
+          "publicReferenceCandidates",
+          "publishers",
+          "institutionContexts"
+        ]
+      },
+      "OwnerResearchCandidateResponseDto": {
+        "type": "object",
+        "properties": {
+          "professional": { "$ref": "#/components/schemas/OfficialProfessionalResponseDto" },
+          "queryMatch": { "$ref": "#/components/schemas/ResearchNameMatchResponseDto" },
+          "institutionalCandidates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/InstitutionalCandidateResponseDto" }
+          },
+          "webCandidates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/WebCandidateResponseDto" }
+          },
+          "publicReferenceCandidates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/PublicReferenceCandidateResponseDto" }
+          },
+          "sourceCoverage": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SourceCoverageResponseDto" }
+          },
+          "signalSummary": { "$ref": "#/components/schemas/ResearchSignalSummaryResponseDto" }
+        },
+        "required": [
+          "professional",
+          "queryMatch",
+          "institutionalCandidates",
+          "webCandidates",
+          "publicReferenceCandidates",
+          "sourceCoverage",
+          "signalSummary"
+        ]
+      },
+      "OwnerResearchCoverageResponseDto": {
+        "type": "object",
+        "properties": {
+          "mspSnapshotChecked": { "type": "boolean" },
+          "linkageSnapshotChecked": { "type": "boolean" },
+          "scheduleArtifactsChecked": { "type": "number" },
+          "webEnrichmentSnapshotChecked": { "type": "boolean" },
+          "curatedReferenceLedgerChecked": { "type": "boolean" },
+          "noFindingsProvesAbsence": { "type": "boolean" }
+        },
+        "required": [
+          "mspSnapshotChecked",
+          "linkageSnapshotChecked",
+          "scheduleArtifactsChecked",
+          "webEnrichmentSnapshotChecked",
+          "curatedReferenceLedgerChecked",
+          "noFindingsProvesAbsence"
+        ]
+      },
+      "OwnerResearchDeliveryResponseDto": {
+        "type": "object",
+        "properties": {
+          "intendedSurface": { "type": "string", "enum": ["AUTHENTICATED_PRIVATE_API"] },
+          "intendedAudience": { "type": "string", "enum": ["OWNER_ONLY"] },
+          "canonicalUrlsIncluded": { "type": "boolean" },
+          "privateApiDeliveryAllowed": { "type": "boolean" },
+          "publicApiDeliveryAllowed": { "type": "boolean" },
+          "authenticationEnforcedBy": { "type": "string", "enum": ["CALLING_API"] }
+        },
+        "required": [
+          "intendedSurface",
+          "intendedAudience",
+          "canonicalUrlsIncluded",
+          "privateApiDeliveryAllowed",
+          "publicApiDeliveryAllowed",
+          "authenticationEnforcedBy"
+        ]
+      },
+      "OwnerResearchPublicationResponseDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["NOT_PUBLISHED"] },
+          "destination": { "type": "string", "enum": ["INTERNAL_RESEARCH_ONLY"] },
+          "publicExportAllowed": { "type": "boolean" },
+          "automaticIdentityConfirmation": { "type": "boolean" },
+          "automaticFactConfirmation": { "type": "boolean" }
+        },
+        "required": [
+          "decision",
+          "destination",
+          "publicExportAllowed",
+          "automaticIdentityConfirmation",
+          "automaticFactConfirmation"
+        ]
+      },
+      "OwnerResearchDossierResponseDto": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": { "type": "number", "enum": [1] },
+          "reportId": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "purpose": { "type": "string", "enum": ["INTERNAL_PROFESSIONAL_RESEARCH"] },
+          "query": { "$ref": "#/components/schemas/OwnerResearchQueryResponseDto" },
+          "candidates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OwnerResearchCandidateResponseDto" }
+          },
+          "coverage": { "$ref": "#/components/schemas/OwnerResearchCoverageResponseDto" },
+          "warnings": { "type": "array", "items": { "type": "string" } },
+          "delivery": { "$ref": "#/components/schemas/OwnerResearchDeliveryResponseDto" },
+          "publication": { "$ref": "#/components/schemas/OwnerResearchPublicationResponseDto" }
+        },
+        "required": [
+          "schemaVersion",
+          "reportId",
+          "generatedAt",
+          "purpose",
+          "query",
+          "candidates",
+          "coverage",
+          "warnings",
+          "delivery",
+          "publication"
+        ]
+      },
+      "OwnerProfessionalResearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "professionalId": { "type": "string", "format": "uuid" },
+          "slug": { "type": "string" },
+          "analysisVersion": { "type": "string" },
+          "runStatus": { "type": "string", "enum": ["COMPLETED", "PARTIAL"] },
+          "reportId": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "queryAmbiguity": {
+            "type": "string",
+            "enum": ["NONE", "MULTIPLE_CANDIDATES", "NO_CANDIDATE"]
+          },
+          "bestFlexibilityIndex": { "type": "number", "enum": [0, 1, 2], "nullable": true },
+          "counts": { "$ref": "#/components/schemas/OwnerResearchCountsResponseDto" },
+          "notice": { "$ref": "#/components/schemas/OwnerResearchNoticeResponseDto" },
+          "dossier": { "$ref": "#/components/schemas/OwnerResearchDossierResponseDto" }
+        },
+        "required": [
+          "professionalId",
+          "slug",
+          "analysisVersion",
+          "runStatus",
+          "reportId",
+          "generatedAt",
+          "queryAmbiguity",
+          "bestFlexibilityIndex",
+          "counts",
+          "notice",
+          "dossier"
+        ]
       }
     }
   },
   "externalDocs": {
     "description": "Referencia interactiva con Scalar",
     "url": "https://api.example.invalid/docs"
-  }
+  },
+  "security": [{ "ownerBasic": [] }, { "ownerApiKey": [] }]
 }

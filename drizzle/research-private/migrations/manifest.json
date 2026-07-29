@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "migrations": [
+    {
+      "id": "0006_professional_research",
+      "file": "0006_professional_research.sql",
+      "sha256": "4cdb4eb318fc33dbb02c6ffd259a11190603dca6a420b76cc57625ae4e85a812",
+      "execution": "BASELINE"
+    },
+    {
+      "id": "0007_owner_research_read_model",
+      "file": "0007_owner_research_read_model.sql",
+      "sha256": "d32fd928fdfd60cfda4f910cb6eeee4829906dc8bcdbe66b7a3d1ba6913d847c",
+      "execution": "MANAGED"
+    }
+  ]
+}

@@ -24,6 +24,11 @@ function configureDeterministicEnvironment(): void {
     CATALOG_DATABASE_URL: 'postgresql://contract:contract@127.0.0.1:9/medicos_openapi_contract',
     CATALOG_DATABASE_POOL_MAX: '1',
     CATALOG_DATABASE_SSL: 'false',
+    OWNER_RESEARCH_DATABASE_URL:
+      'postgresql://contract:contract@127.0.0.1:9/medicos_openapi_contract',
+    OWNER_RESEARCH_DATABASE_POOL_MAX: '1',
+    OWNER_API_BASIC_USERNAME: 'owner',
+    OWNER_API_KEY_SHA256: 'c64bcba7b5650a21e86aaa762fe60684b0cf4d9791120337bdb840047907fb0e',
   });
 }
 
@@ -46,14 +51,22 @@ export async function generatePublicOpenApiDocument(): Promise<string> {
       apiDocumentation: {
         enabled: false,
       },
+      ownerAuthentication: {
+        basicEnabled: true,
+      },
     });
     await app.init();
     const document = createOpenApiDocument(app, {
+      authentication: {
+        basic: true,
+        firebaseBearer: false,
+        ownerApiKey: true,
+      },
       enabled: true,
       publicBaseUrl: 'https://api.example.invalid',
       title: 'Directorio Médico Uruguay',
       description:
-        'API pública, de solo lectura, del directorio médico uruguayo. Los datos pueden estar desactualizados y deben verificarse en su fuente oficial.',
+        'API privada, de solo lectura, del directorio médico uruguayo. Los datos y candidatos pueden estar desactualizados y deben verificarse en su fuente original.',
       version: '1.0.0',
       repositoryUrl: 'https://github.com/eduair94/medicos-uy',
     });

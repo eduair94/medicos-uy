@@ -26,6 +26,7 @@ set +a
 
 application_directory="${MEDICOS_APP_DIRECTORY:-/srv/medicos-backend/current}"
 tsx_executable="${MEDICOS_TSX_EXECUTABLE:-${application_directory}/node_modules/.bin/tsx}"
+node_executable="${MEDICOS_NODE_EXECUTABLE:-$(command -v node)}"
 flock_executable="${MEDICOS_FLOCK_EXECUTABLE:-/usr/bin/flock}"
 lock_file="${MEDICOS_ANALYSIS_LOCK_FILE:-/var/lib/medicos-backend/private-analysis.lock}"
 status_file="${MEDICOS_ANALYSIS_STATUS_FILE:-/var/lib/medicos-backend/logs/private-analysis/latest.json}"
@@ -48,6 +49,17 @@ if [ ! -x "${tsx_executable}" ]; then
   echo "tsx executable is unavailable: ${tsx_executable}" >&2
   exit 1
 fi
+if [ ! -x "${node_executable}" ] ||
+  ! "${node_executable}" -e '
+    const [major, minor] = process.versions.node.split(".").map(Number);
+    const supported = (major === 22 && minor >= 14) || (major === 24 && minor >= 15);
+    process.exit(supported ? 0 : 1);
+  '; then
+  echo "MEDICOS_NODE_EXECUTABLE must point to supported Node.js 22 or 24 LTS" >&2
+  exit 1
+fi
+PATH="$(dirname "${node_executable}"):${PATH}"
+export PATH
 if [ ! -x "${flock_executable}" ]; then
   echo "flock executable is unavailable: ${flock_executable}" >&2
   exit 1

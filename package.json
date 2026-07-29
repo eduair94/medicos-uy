@@ -22,7 +22,7 @@
   "type": "commonjs",
   "packageManager": "pnpm@11.17.0",
   "engines": {
-    "node": ">=24.15.0 <25",
+    "node": ">=22.14.0 <23 || >=24.15.0 <25",
     "pnpm": ">=11.17.0 <12"
   },
   "scripts": {
@@ -55,6 +55,9 @@
     "db:generate:catalog": "drizzle-kit generate --config drizzle/catalog/drizzle.config.ts",
     "db:migrate:catalog": "drizzle-kit migrate --config drizzle/catalog/drizzle.config.ts",
     "db:seed:catalog": "tsx drizzle/catalog/seed.ts",
+    "db:migrate:owner-research": "tsx scripts/database/manage-owner-research-migrations.ts apply",
+    "db:verify:owner-research": "tsx scripts/database/manage-owner-research-migrations.ts verify",
+    "db:verify:owner-research-files": "tsx scripts/database/manage-owner-research-migrations.ts verify-files",
     "data:setup": "tsx scripts/ingestion/setup-data-environment.ts",
     "data:prepare": "tsx scripts/ingestion/prepare-data-directories.ts",
     "data:ingest:msp": "tsx scripts/ingestion/msp/ingest-infotitulos.ts",

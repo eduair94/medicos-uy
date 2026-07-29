@@ -8,4 +8,7 @@ void bootstrapHttpApplication(CommandApiModule, {
   apiDocumentation: {
     enabled: false,
   },
+  ownerAuthentication: {
+    basicEnabled: false,
+  },
 }).catch(reportBootstrapError);
