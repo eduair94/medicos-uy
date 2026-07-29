@@ -3,6 +3,8 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 
 import type { EnabledOwnerAuthenticationMethods } from './owner-authentication';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import type { FastifyRequest } from 'fastify';
+import type { ServerResponse } from 'node:http';
 
 export const OPENAPI_DOCUMENT_PATH = '/openapi.json' as const;
 export const SCALAR_DOCUMENTATION_PATH = '/docs' as const;
@@ -302,21 +304,27 @@ export function registerApiDocumentation(
     });
   }
 
-  app.use(
-    SCALAR_DOCUMENTATION_PATH,
-    apiReference({
-      cdn: SCALAR_CDN_URL,
-      hideClientButton: false,
-      layout: 'modern',
-      pageTitle: `${options.title} | API`,
-      persistAuth: false,
-      showDeveloperTools: 'always',
-      telemetry: false,
-      theme: 'default',
-      url: OPENAPI_DOCUMENT_PATH,
-      withFastify: true,
-    }),
-  );
+  const scalarReference = apiReference({
+    cdn: SCALAR_CDN_URL,
+    hideClientButton: false,
+    layout: 'modern',
+    pageTitle: `${options.title} | API`,
+    persistAuth: false,
+    showDeveloperTools: 'always',
+    telemetry: false,
+    theme: 'default',
+    url: OPENAPI_DOCUMENT_PATH,
+    withFastify: true,
+  }) as (request: FastifyRequest, response: ServerResponse) => void;
+
+  // Nest middleware mounted through app.use() can bypass Fastify lifecycle
+  // hooks after the real HTTP server starts. Register Scalar as a native route
+  // so owner authentication and rate limiting always execute first.
+  fastify.get(SCALAR_DOCUMENTATION_PATH, (request, reply) => {
+    reply.hijack();
+    reply.raw.setHeader('cache-control', 'private, no-store');
+    scalarReference(request, reply.raw);
+  });
 
   return document;
 }
