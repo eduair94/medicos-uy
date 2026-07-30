@@ -237,6 +237,7 @@ async function applyResearchMigrations(pool: Pool): Promise<void> {
     '0006_professional_research.sql',
     '0007_owner_research_read_model.sql',
     '0008_cmu_ethics_metadata_snapshot.sql',
+    '0009_owner_research_keyset_page.sql',
   ]) {
     const migrationSql = await readFile(
       resolve(process.cwd(), 'drizzle/research-private/migrations', file),
@@ -418,6 +419,90 @@ describeWithDocker('owner research SQL migrations and sanitizer', () => {
         client.query('SELECT count(*) FROM research_private.owner_professional_dossier'),
       ),
     ).rejects.toThrow(/permission denied/u);
+  });
+
+  it('grants only the owner reader access to the bounded page function', async () => {
+    const privileges = await pool.query<{
+      readonly owner_execute: boolean;
+      readonly public_execute: boolean;
+      readonly ingestor_execute: boolean;
+    }>(`
+      SELECT
+        has_function_privilege(
+          'medicos_owner_research_reader',
+          'research_private.list_owner_professional_dossiers_page(text,uuid,integer)',
+          'EXECUTE'
+        ) AS owner_execute,
+        has_function_privilege(
+          'medicos_public_query',
+          'research_private.list_owner_professional_dossiers_page(text,uuid,integer)',
+          'EXECUTE'
+        ) AS public_execute,
+        has_function_privilege(
+          'medicos_private_ingestor',
+          'research_private.list_owner_professional_dossiers_page(text,uuid,integer)',
+          'EXECUTE'
+        ) AS ingestor_execute
+    `);
+
+    expect(privileges.rows[0]).toEqual({
+      owner_execute: true,
+      public_execute: false,
+      ingestor_execute: false,
+    });
+
+    await expect(
+      withRole(pool, 'medicos_owner_research_reader', async (client) =>
+        client.query(
+          `SELECT count(*)
+             FROM research_private.list_owner_professional_dossiers_page(
+               NULL,
+               NULL,
+               51
+             )`,
+        ),
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      withRole(pool, 'medicos_public_query', async (client) =>
+        client.query(
+          `SELECT count(*)
+             FROM research_private.list_owner_professional_dossiers_page(
+               NULL,
+               NULL,
+               51
+             )`,
+        ),
+      ),
+    ).rejects.toThrow(/permission denied/u);
+  });
+
+  it('rejects unbounded or incomplete page requests inside PostgreSQL', async () => {
+    await expect(
+      withRole(pool, 'medicos_owner_research_reader', async (client) =>
+        client.query(
+          `SELECT *
+             FROM research_private.list_owner_professional_dossiers_page(
+               NULL,
+               NULL,
+               52
+             )`,
+        ),
+      ),
+    ).rejects.toThrow(/requested_limit must be between 1 and 51/u);
+
+    await expect(
+      withRole(pool, 'medicos_owner_research_reader', async (client) =>
+        client.query(
+          `SELECT *
+             FROM research_private.list_owner_professional_dossiers_page(
+               'cursor-without-id',
+               NULL,
+               20
+             )`,
+        ),
+      ),
+    ).rejects.toThrow(/both cursor fields must be null or non-null/u);
   });
 
   it('matches the strict API DTO while removing private and unknown fields', async () => {

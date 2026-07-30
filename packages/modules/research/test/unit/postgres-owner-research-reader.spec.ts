@@ -120,8 +120,9 @@ describe('PostgresOwnerResearchReader', () => {
     expect(firstPage.nextCursor).toBeTypeOf('string');
 
     const [firstStatement, firstParameters] = query.mock.calls[0] as [string, readonly unknown[]];
-    expect(firstStatement).toContain("WHERE route_kind = 'CURRENT'");
-    expect(firstStatement).toContain('ORDER BY route_slug ASC, professional_public_id ASC');
+    expect(firstStatement).toContain('research_private.list_owner_professional_dossiers_page');
+    expect(firstStatement).toContain('NULL::text');
+    expect(firstStatement).toContain('NULL::uuid');
     expect(firstStatement).not.toContain('professional_dossier AS');
     expect(firstParameters).toEqual([3]);
 
@@ -139,8 +140,9 @@ describe('PostgresOwnerResearchReader', () => {
     });
 
     const [secondStatement, secondParameters] = query.mock.calls[1] as [string, readonly unknown[]];
-    expect(secondStatement).toContain('route_slug > $1');
-    expect(secondStatement).toContain('professional_public_id > $2::uuid');
+    expect(secondStatement).toContain('research_private.list_owner_professional_dossiers_page');
+    expect(secondStatement).toContain('$1::text');
+    expect(secondStatement).toContain('$2::uuid');
     expect(secondParameters).toEqual(['beatriz-prueba', secondId, 3]);
   });
 

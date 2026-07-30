@@ -139,7 +139,7 @@ function callIndex(
 }
 
 describe('owner-research migration management', () => {
-  it('loads the immutable repository plan through the CMU metadata migration', async () => {
+  it('loads the immutable repository plan through the bounded owner page migration', async () => {
     const plan = await loadOwnerResearchMigrationPlan();
 
     expect(plan.map(({ id, execution }) => ({ id, execution }))).toEqual([
@@ -153,6 +153,10 @@ describe('owner-research migration management', () => {
       },
       {
         id: '0008_cmu_ethics_metadata_snapshot',
+        execution: 'MANAGED',
+      },
+      {
+        id: '0009_owner_research_keyset_page',
         execution: 'MANAGED',
       },
     ]);

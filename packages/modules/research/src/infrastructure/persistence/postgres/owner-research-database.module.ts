@@ -25,6 +25,11 @@ const VERIFY_OWNER_RESEARCH_DATABASE_ISOLATION = `
       'research_private.owner_professional_dossier',
       'SELECT'
     )
+    AND has_function_privilege(
+      current_user,
+      'research_private.list_owner_professional_dossiers_page(text,uuid,integer)',
+      'EXECUTE'
+    )
     AND NOT has_table_privilege(
       current_user,
       'research_private.professional_dossier',

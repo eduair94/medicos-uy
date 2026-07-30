@@ -21,6 +21,9 @@ describe('OwnerResearchDatabaseReadinessProbe', () => {
     expect(statement).toContain("current_user = 'medicos_owner_research_query'");
     expect(statement).toContain("current_setting('transaction_read_only') = 'on'");
     expect(statement).toContain("'research_private.owner_professional_dossier'");
+    expect(statement).toContain(
+      "'research_private.list_owner_professional_dossiers_page(text,uuid,integer)'",
+    );
     expect(statement).toContain("'research_private.professional_dossier'");
     expect(statement).toContain("'research_private.candidate'");
     expect(statement).toContain("'ingestion_private'");

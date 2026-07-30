@@ -70,22 +70,20 @@ const FIND_BY_SLUG = `
 
 const LIST_CURRENT_FIRST_PAGE = `
   SELECT ${SELECT_COLUMNS}
-  FROM research_private.owner_professional_dossier
-  WHERE route_kind = 'CURRENT'
-  ORDER BY route_slug ASC, professional_public_id ASC
-  LIMIT $1
+  FROM research_private.list_owner_professional_dossiers_page(
+    NULL::text,
+    NULL::uuid,
+    $1::integer
+  )
 `;
 
 const LIST_CURRENT_AFTER_CURSOR = `
   SELECT ${SELECT_COLUMNS}
-  FROM research_private.owner_professional_dossier
-  WHERE route_kind = 'CURRENT'
-    AND (
-      route_slug > $1
-      OR (route_slug = $1 AND professional_public_id > $2::uuid)
-    )
-  ORDER BY route_slug ASC, professional_public_id ASC
-  LIMIT $3
+  FROM research_private.list_owner_professional_dossiers_page(
+    $1::text,
+    $2::uuid,
+    $3::integer
+  )
 `;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
