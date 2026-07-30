@@ -6,6 +6,7 @@ import {
   institutionalSourceRecordKey,
   normalizeResearchPersonName,
   type BuildProfessionalResearchViewInput,
+  type CuratedEthicsCaseReference,
   type CuratedPublicReference,
   type ResearchInstitutionalLinkageCandidate,
   type ResearchMspProfessional,
@@ -185,6 +186,43 @@ function webCandidate(): WebEnrichmentCandidate {
   };
 }
 
+function ethicsCase(observedRespondentNames: readonly string[]): CuratedEthicsCaseReference {
+  return {
+    schemaVersion: 1,
+    ethicsCaseId: `ethics_case_v1_${'8'.repeat(64)}`,
+    sourceCaseKey: '142/2021',
+    publisher: 'Colegio Medico del Uruguay',
+    tribunal: 'Tribunal de Etica Medica',
+    title: '142/2021 ASSE C/ DR. FABRICIO EJEMPLO',
+    canonicalUrl: 'https://www.colegiomedico.org.uy/fallos/expediente-142-2021-asse-c-dr-ejemplo/',
+    collectionMode: 'AUTOMATED_PUBLIC_METADATA_SNAPSHOT',
+    visibility: 'ORIGINAL',
+    outcome: 'UNKNOWN',
+    finalityStatus: 'UNKNOWN',
+    currentnessVerified: false,
+    sourceDate: '2022-11-28',
+    sourceDatePrecision: 'DAY',
+    observedRespondentNames,
+    documents: [
+      {
+        label: 'Fallo del Tribunal de Etica Medica',
+        sourceDate: '2022-11-28',
+        sourceDatePrecision: 'DAY',
+        contentFetched: false,
+      },
+    ],
+    firstObservedAt: '2026-07-29T15:00:00.000Z',
+    lastObservedAt: '2026-07-29T15:00:00.000Z',
+    contentStored: false,
+    source: {
+      sitemapUrl: 'https://www.colegiomedico.org.uy/fallos-sitemap.xml',
+      sitemapLastModified: '2026-07-29',
+      robotsUrl: 'https://www.colegiomedico.org.uy/robots.txt',
+      pageMetadataOnly: true,
+    },
+  };
+}
+
 function input(): BuildProfessionalResearchViewInput {
   const spanishFile = 'raw/mutualistas/espanola/schedules.ndjson';
   const uruguayanFile = 'raw/mutualistas/medica-uruguaya/schedules.ndjson';
@@ -307,6 +345,123 @@ describe('professional research view', () => {
     expect(result.candidates.every(({ queryMatch }) => queryMatch.flexibilityIndex === 0)).toBe(
       true,
     );
+  });
+
+  it('emits an exact ethics-case name candidate without confirming identity or sanction', () => {
+    const syntheticProfessional: ResearchMspProfessional = {
+      ...professional,
+      linkageId: `msp_doc_v1_${'7'.repeat(64)}`,
+      fullName: 'FABRICIO EJEMPLO',
+    };
+    const result = buildProfessionalResearchView({
+      ...input(),
+      query: { mode: 'OPAQUE_MSP_ID', value: syntheticProfessional.linkageId },
+      mspProfessionals: [syntheticProfessional],
+      institutionalLinkageCandidates: [],
+      schedulesBySourceRecord: new Map(),
+      webCandidates: [],
+      publicReferences: [],
+      ethicsCases: [ethicsCase(['FABRICIO EJEMPLO'])],
+      ethicsMetadataSnapshotChecked: true,
+      sourceCoverage: [
+        {
+          sourceId: 'cmu-tribunal-etica-fallos',
+          publisher: 'Colegio Medico del Uruguay',
+          sourceUrl: 'https://www.colegiomedico.org.uy/fallos-sitemap.xml',
+          category: 'PROFESSIONAL_ETHICS_RULINGS',
+          status: 'CHECKED',
+          policyReviewedAt: '2026-07-29',
+          automatedFetchPerformed: true,
+          namedMatchStatus: 'NO_NAMED_MATCH_IN_CURRENT_VISIBLE_INDEX',
+          noFindingProvesAbsence: false,
+          identityDecision: 'NOT_LINKED',
+          publicationDecision: 'NOT_PUBLISHED',
+          warnings: ['EXACT_NAME_CANDIDATES_REQUIRE_HUMAN_REVIEW'],
+        },
+      ],
+    });
+
+    const candidate = result.candidates[0];
+    expect(candidate?.ethicsCaseCandidates).toHaveLength(1);
+    expect(candidate?.ethicsCaseCandidates[0]).toMatchObject({
+      observedName: 'FABRICIO EJEMPLO',
+      nameMatch: { flexibilityIndex: 0 },
+      decision: {
+        identityConfirmed: false,
+        factConfirmed: false,
+        linkageDecision: 'NOT_LINKED',
+        publicationDecision: 'NOT_PUBLISHED',
+        publicExportAllowed: false,
+        requiresHumanReview: true,
+      },
+    });
+    expect(candidate?.ethicsCaseCandidates[0]?.alerts).toContain(
+      'CASE_PAGE_PRESENCE_DOES_NOT_ESTABLISH_A_SANCTION',
+    );
+    expect(candidate?.sourceCoverage[0]?.namedMatchStatus).toBe('CANDIDATE_REQUIRES_HUMAN_REVIEW');
+    expect(result.coverage).toEqual(
+      expect.objectContaining({
+        ethicsMetadataSnapshotChecked: true,
+        ethicsCasesObserved: 1,
+      }),
+    );
+  });
+
+  it('retains a partial ethics-case candidate with a strong ambiguity warning', () => {
+    const syntheticProfessional: ResearchMspProfessional = {
+      ...professional,
+      linkageId: `msp_doc_v1_${'6'.repeat(64)}`,
+      fullName: 'LUCIA PRUEBA SEGUNDO',
+    };
+    const result = buildProfessionalResearchView({
+      ...input(),
+      query: { mode: 'OPAQUE_MSP_ID', value: syntheticProfessional.linkageId },
+      mspProfessionals: [syntheticProfessional],
+      institutionalLinkageCandidates: [],
+      schedulesBySourceRecord: new Map(),
+      webCandidates: [],
+      publicReferences: [],
+      ethicsCases: [ethicsCase(['LUCIA PRUEBA'])],
+    });
+
+    expect(result.candidates[0]?.ethicsCaseCandidates[0]).toMatchObject({
+      observedName: 'LUCIA PRUEBA',
+      nameMatch: { kind: 'PARTIAL_TOKEN_SUBSET', flexibilityIndex: 1 },
+      decision: {
+        identityConfirmed: false,
+        factConfirmed: false,
+        linkageDecision: 'NOT_LINKED',
+        publicationDecision: 'NOT_PUBLISHED',
+        requiresHumanReview: true,
+      },
+    });
+    expect(result.candidates[0]?.ethicsCaseCandidates[0]?.alerts).toEqual(
+      expect.arrayContaining([
+        'PARTIAL_NAME_MAY_REFER_TO_ANOTHER_PERSON',
+        'PARTIAL_CASE_TITLE_NAME_IS_HIGHLY_AMBIGUOUS',
+        'ALL_TOKEN_SUBSET_AND_HOMONYM_CANDIDATES_ARE_RETAINED',
+      ]),
+    );
+  });
+
+  it('does not create ethics candidates from initials or one-token observed names', () => {
+    const syntheticProfessional: ResearchMspProfessional = {
+      ...professional,
+      linkageId: `msp_doc_v1_${'5'.repeat(64)}`,
+      fullName: 'LUCIA PRUEBA SEGUNDO',
+    };
+    const result = buildProfessionalResearchView({
+      ...input(),
+      query: { mode: 'OPAQUE_MSP_ID', value: syntheticProfessional.linkageId },
+      mspProfessionals: [syntheticProfessional],
+      institutionalLinkageCandidates: [],
+      schedulesBySourceRecord: new Map(),
+      webCandidates: [],
+      publicReferences: [],
+      ethicsCases: [ethicsCase(['L. PRUEBA']), ethicsCase(['LUCIA'])],
+    });
+
+    expect(result.candidates[0]?.ethicsCaseCandidates).toEqual([]);
   });
 
   it('normalizes accents, surname-first forms and initials without treating them as confidence', () => {

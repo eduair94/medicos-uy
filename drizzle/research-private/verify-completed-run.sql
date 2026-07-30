@@ -89,19 +89,95 @@ BEGIN
   FROM research_private.professional_dossier
   WHERE run_id = latest_run_id
     AND (
-      ethics_candidate_count <> 0
-      OR research_view #>> '{candidates,0,sourceCoverage,0,sourceUrl}' <>
-        'https://www.colegiomedico.org.uy/fallos-emitidos-por-el-tribunal-de-etica/'
-      OR research_view #>> '{candidates,0,sourceCoverage,0,status}' <>
-        'SOURCE_BLOCKED_ROBOTS'
-      OR research_view #>> '{candidates,0,sourceCoverage,0,automatedFetchPerformed}' <>
-        'false'
-      OR research_view #>> '{candidates,0,sourceCoverage,0,identityDecision}' <>
+      research_view #>> '{candidates,0,sourceCoverage,0,sourceUrl}' IS DISTINCT FROM
+        'https://www.colegiomedico.org.uy/fallos-sitemap.xml'
+      OR research_view #>> '{candidates,0,sourceCoverage,0,status}' IS DISTINCT FROM
+        'CHECKED'
+      OR research_view #>> '{candidates,0,sourceCoverage,0,automatedFetchPerformed}' IS DISTINCT FROM
+        'true'
+      OR research_view #>> '{candidates,0,sourceCoverage,0,identityDecision}' IS DISTINCT FROM
         'NOT_LINKED'
+      OR research_view #>> '{candidates,0,sourceCoverage,0,noFindingProvesAbsence}' IS DISTINCT FROM
+        'false'
+      OR COALESCE(
+        jsonb_array_length(
+          research_view #> '{candidates,0,ethicsCaseCandidates}'
+        ),
+        0
+      ) <> ethics_candidate_count
+      OR (
+        SELECT count(*)
+        FROM research_private.professional_ethics_candidate AS ethics_candidate
+        WHERE ethics_candidate.run_id = latest_run_id
+          AND ethics_candidate.internal_hmac_id =
+            professional_dossier.internal_hmac_id
+      ) <> ethics_candidate_count
+      OR (
+        SELECT count(*)
+        FROM research_private.candidate AS candidate
+        WHERE candidate.run_id = latest_run_id
+          AND candidate.internal_hmac_id =
+            professional_dossier.internal_hmac_id
+          AND candidate.candidate_kind = 'ETHICS_CASE_REFERENCE'
+      ) <> ethics_candidate_count
     );
 
   IF invalid_ethics_coverage <> 0 THEN
     RAISE EXCEPTION '% dossiers have invalid ethics-source coverage', invalid_ethics_coverage;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM research_private.professional_ethics_candidate
+    WHERE run_id = latest_run_id
+      AND (
+        match_kind NOT IN (
+          'EXACT_NORMALIZED_NAME',
+          'EXACT_TOKEN_MULTISET',
+          'PARTIAL_TOKEN_SUBSET'
+        )
+        OR (
+          match_kind IN ('EXACT_NORMALIZED_NAME', 'EXACT_TOKEN_MULTISET')
+          AND match_flexibility_index <> 0
+        )
+        OR (
+          match_kind = 'PARTIAL_TOKEN_SUBSET'
+          AND match_flexibility_index <> 1
+        )
+        OR candidate_status <> 'UNVERIFIED_REVIEW_CANDIDATE'
+        OR identity_confirmed
+        OR fact_confirmed
+        OR NOT requires_human_review
+      )
+  ) THEN
+    RAISE EXCEPTION 'latest run contains an unsafe ethics candidate';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM research_private.ethics_case
+    WHERE collection_mode = 'AUTOMATED_PUBLIC_METADATA_SNAPSHOT'
+      AND (
+        outcome <> 'UNKNOWN'
+        OR finality_status <> 'UNKNOWN'
+        OR currentness_verified
+        OR document_sha256 IS NOT NULL
+        OR content_stored
+        OR NOT (
+          source_metadata @> '{
+            "safeguards": {
+              "pageMetadataOnly": true,
+              "pdfFetched": false,
+              "documentContentFetched": false,
+              "automaticIdentityConfirmation": false,
+              "automaticFactConfirmation": false,
+              "publicExportAllowed": false
+            }
+          }'::jsonb
+        )
+      )
+  ) THEN
+    RAISE EXCEPTION 'automated ethics metadata violates its safety contract';
   END IF;
 END
 $verification$;

@@ -12,7 +12,12 @@ import {
   type ProfessionalSearch,
 } from '@medicos/professionals';
 import { APPROVED_EVIDENCE_FINDER, type ApprovedEvidenceFinder } from '@medicos/provenance';
-import { GetOwnerProfessionalResearch, type OwnerProfessionalResearch } from '@medicos/research';
+import {
+  GetOwnerProfessionalResearch,
+  ListOwnerProfessionalResearch,
+  type OwnerProfessionalResearch,
+  type OwnerProfessionalResearchPage,
+} from '@medicos/research';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -86,6 +91,28 @@ const ownerResearch = {
     candidates: [],
   },
 } as unknown as OwnerProfessionalResearch;
+const ownerResearchPage = {
+  items: [
+    {
+      ...ownerResearch,
+      labels: {
+        associationReview: 'UNVERIFIED_REVIEW_CANDIDATE',
+        originalSourceVerificationRequired: true,
+      },
+    },
+  ],
+  pagination: {
+    limit: 10,
+    returned: 1,
+    hasMore: true,
+    nextCursor: 'synthetic-opaque-next-cursor',
+  },
+  labels: {
+    access: 'OWNER_ONLY',
+    associations: 'UNVERIFIED_CANDIDATES_INCLUDED',
+    projection: 'SANITIZED_OWNER_RESEARCH_VIEW',
+  },
+} as const satisfies OwnerProfessionalResearchPage;
 
 describe('public query API', () => {
   let app: NestFastifyApplication;
@@ -122,6 +149,7 @@ describe('public query API', () => {
       },
     ]);
   const getOwnerProfessionalResearch = vi.fn().mockResolvedValue(ownerResearch);
+  const listOwnerProfessionalResearch = vi.fn().mockResolvedValue(ownerResearchPage);
 
   beforeAll(async () => {
     const moduleReference = await Test.createTestingModule({
@@ -146,6 +174,10 @@ describe('public query API', () => {
       .overrideProvider(GetOwnerProfessionalResearch)
       .useValue({
         execute: getOwnerProfessionalResearch,
+      })
+      .overrideProvider(ListOwnerProfessionalResearch)
+      .useValue({
+        execute: listOwnerProfessionalResearch,
       })
       .overrideProvider(READINESS_PROBES)
       .useValue([
@@ -206,6 +238,7 @@ describe('public query API', () => {
   it.each([
     '/v1/professionals',
     '/v1/professionals/ana-perez/research',
+    '/v1/owner/research/professionals',
     '/openapi.json',
     '/docs',
     '/.well-known/api-catalog',
@@ -307,6 +340,49 @@ describe('public query API', () => {
     expect(getOwnerProfessionalResearch).toHaveBeenCalledWith(professional.id);
   });
 
+  it('lists complete sanitized research dossiers with unverified review labels', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/owner/research/professionals?limit=10&cursor=synthetic-current-cursor',
+      headers: ownerApiKeyHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.json()).toMatchObject({
+      items: [
+        {
+          professionalId: professional.id,
+          labels: {
+            associationReview: 'UNVERIFIED_REVIEW_CANDIDATE',
+            originalSourceVerificationRequired: true,
+          },
+          notice: {
+            associationsAreUnconfirmedCandidates: true,
+          },
+          dossier: {
+            reportId: 'professional_research_v1_e2e',
+          },
+        },
+      ],
+      pagination: {
+        limit: 10,
+        returned: 1,
+        hasMore: true,
+        nextCursor: 'synthetic-opaque-next-cursor',
+      },
+      labels: {
+        access: 'OWNER_ONLY',
+        associations: 'UNVERIFIED_CANDIDATES_INCLUDED',
+        projection: 'SANITIZED_OWNER_RESEARCH_VIEW',
+      },
+    });
+    expect(listOwnerProfessionalResearch).toHaveBeenCalledWith({
+      cursor: 'synthetic-current-cursor',
+      limit: 10,
+    });
+  });
+
   it('returns RFC 9457 problem details for an unknown professional', async () => {
     const response = await app.inject({
       method: 'GET',
@@ -387,6 +463,7 @@ describe('public query API', () => {
       [
         '/health/live',
         '/health/ready',
+        '/v1/owner/research/professionals',
         '/v1/professionals',
         '/v1/professionals/{idOrSlug}',
         '/v1/professionals/{idOrSlug}/research',
@@ -400,6 +477,17 @@ describe('public query API', () => {
     expect(document.paths['/v1/professionals']?.get?.responses?.['400']?.content).toHaveProperty(
       'application/problem+json',
     );
+    expect(document.paths['/v1/owner/research/professionals']?.get?.operationId).toBe(
+      'listOwnerProfessionalResearch',
+    );
+    expect(
+      document.paths['/v1/owner/research/professionals']?.get?.parameters?.map(
+        (parameter) => parameter.name,
+      ),
+    ).toEqual(['limit', 'cursor']);
+    expect(
+      document.paths['/v1/owner/research/professionals']?.get?.responses?.['400']?.content,
+    ).toHaveProperty('application/problem+json');
     expect(document.components?.securitySchemes).toEqual({
       ownerBasic: {
         type: 'http',

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import {
   alertsForResearchNameMatch,
   institutionalSourceRecordKey,
+  isResearchEthicsCandidateNameMatch,
 } from '../domain/professional-research-contracts';
 import {
   evaluateResearchPersonName,
@@ -20,6 +21,7 @@ import type { ResearchPersonNameMatch } from '../domain/research-person-name';
 
 type PublicReferenceCandidate =
   ProfessionalResearchCandidateView['publicReferenceCandidates'][number];
+type EthicsCaseCandidate = ProfessionalResearchCandidateView['ethicsCaseCandidates'][number];
 
 function stableUnique(values: readonly string[]): readonly string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right, 'es'));
@@ -78,6 +80,69 @@ function directReferenceMatches(
     }
   }
   return result;
+}
+
+function buildEthicsCaseCandidates(
+  professional: ResearchMspProfessional,
+  input: BuildProfessionalResearchViewInput,
+): readonly EthicsCaseCandidate[] {
+  return (input.ethicsCases ?? [])
+    .flatMap<EthicsCaseCandidate>((ethicsCase): readonly EthicsCaseCandidate[] => {
+      const best = ethicsCase.observedRespondentNames
+        .flatMap((observedName) => {
+          const nameMatch = evaluateResearchPersonName(professional.fullName, observedName);
+          return nameMatch !== null && isResearchEthicsCandidateNameMatch(nameMatch)
+            ? [{ observedName, nameMatch }]
+            : [];
+        })
+        .sort((left, right) => {
+          const flexibilityOrder =
+            left.nameMatch.flexibilityIndex - right.nameMatch.flexibilityIndex;
+          if (flexibilityOrder !== 0) {
+            return flexibilityOrder;
+          }
+          const kindOrder =
+            Number(left.nameMatch.kind === 'EXACT_TOKEN_MULTISET') -
+            Number(right.nameMatch.kind === 'EXACT_TOKEN_MULTISET');
+          return kindOrder === 0
+            ? left.observedName.localeCompare(right.observedName, 'es')
+            : kindOrder;
+        })[0];
+      return best === undefined
+        ? []
+        : [
+            {
+              ethicsCase,
+              observedName: best.observedName,
+              nameMatch: best.nameMatch,
+              decision: {
+                identityConfirmed: false,
+                factConfirmed: false,
+                linkageDecision: 'NOT_LINKED',
+                publicationDecision: 'NOT_PUBLISHED',
+                publicExportAllowed: false,
+                requiresHumanReview: true,
+              },
+              alerts: [
+                ...alertsForResearchNameMatch(best.nameMatch),
+                ...(best.nameMatch.flexibilityIndex === 0
+                  ? ['EXACT_CASE_TITLE_NAME_IS_NOT_IDENTITY_CONFIRMATION']
+                  : [
+                      'PARTIAL_CASE_TITLE_NAME_IS_HIGHLY_AMBIGUOUS',
+                      'ALL_TOKEN_SUBSET_AND_HOMONYM_CANDIDATES_ARE_RETAINED',
+                      'PARTIAL_CASE_TITLE_MATCH_REQUIRES_INDEPENDENT_IDENTITY_CORROBORATION',
+                    ]),
+                'CASE_PAGE_PRESENCE_DOES_NOT_ESTABLISH_A_SANCTION',
+                'OUTCOME_AND_FINALITY_WERE_NOT_READ_FROM_DOCUMENT_CONTENT',
+                'SOURCE_DOCUMENTS_WERE_NOT_FETCHED_DUE_TO_ROBOTS_POLICY',
+                'ETHICS_CASE_CANDIDATE_REQUIRES_HUMAN_REVIEW',
+              ],
+            },
+          ];
+    })
+    .sort((left, right) =>
+      left.ethicsCase.ethicsCaseId.localeCompare(right.ethicsCase.ethicsCaseId),
+    );
 }
 
 function buildCandidate(
@@ -170,12 +235,25 @@ function buildCandidate(
         : [];
     })
     .sort((left, right) => left.reference.referenceId.localeCompare(right.reference.referenceId));
+  const ethicsCaseCandidates = buildEthicsCaseCandidates(professional, input);
+  const sourceCoverage = (input.sourceCoverage ?? []).map((coverage) =>
+    coverage.category === 'PROFESSIONAL_ETHICS_RULINGS' && coverage.status === 'CHECKED'
+      ? {
+          ...coverage,
+          namedMatchStatus:
+            ethicsCaseCandidates.length > 0
+              ? ('CANDIDATE_REQUIRES_HUMAN_REVIEW' as const)
+              : ('NO_NAMED_MATCH_IN_CURRENT_VISIBLE_INDEX' as const),
+        }
+      : coverage,
+  );
 
   const publishers = stableUnique([
     professional.provenance.publisher,
     ...institutionalCandidates.map(({ institution }) => institution),
     ...webCandidates.map(({ claim }) => claim.publisher),
     ...publicReferenceCandidates.map(({ reference }) => reference.publisher),
+    ...ethicsCaseCandidates.map(({ ethicsCase }) => ethicsCase.publisher),
   ]);
   const institutionContexts = stableUnique(
     publicReferenceCandidates.flatMap(({ reference }) => reference.claim.institutionContext),
@@ -186,7 +264,8 @@ function buildCandidate(
     institutionalCandidates,
     webCandidates,
     publicReferenceCandidates,
-    sourceCoverage: input.sourceCoverage ?? [],
+    ethicsCaseCandidates,
+    sourceCoverage,
     signalSummary: {
       officialRegistryRecords: 1,
       institutionalCandidates: institutionalCandidates.length,
@@ -196,6 +275,7 @@ function buildCandidate(
       ),
       webCandidates: webCandidates.length,
       publicReferenceCandidates: publicReferenceCandidates.length,
+      ethicsCandidates: ethicsCaseCandidates.length,
       publishers,
       institutionContexts,
     },
@@ -249,6 +329,8 @@ export function buildProfessionalResearchView(
       scheduleArtifactsChecked: input.checkedScheduleArtifacts,
       webEnrichmentSnapshotChecked: input.webEnrichmentSnapshotChecked,
       curatedReferenceLedgerChecked: input.curatedReferenceLedgerChecked,
+      ethicsMetadataSnapshotChecked: input.ethicsMetadataSnapshotChecked ?? false,
+      ethicsCasesObserved: input.ethicsCases?.length ?? 0,
       noFindingsProvesAbsence: false,
     },
     warnings: [
@@ -257,6 +339,7 @@ export function buildProfessionalResearchView(
       'ACADEMIC_MENTION_DOES_NOT_ESTABLISH_EMPLOYMENT_OR_CURRENT_AFFILIATION',
       'SCHEDULES_ARE_TIME_STAMPED_OBSERVATIONS_AND_MAY_CHANGE',
       'NO_FINDINGS_DOES_NOT_PROVE_ABSENCE',
+      'ETHICS_CASE_PAGE_METADATA_DOES_NOT_ESTABLISH_IDENTITY_SANCTION_OR_FINALITY',
       'INTERNAL_RESEARCH_OUTPUT_MUST_NOT_ENTER_THE_PUBLIC_DIRECTORY',
     ],
     delivery: {

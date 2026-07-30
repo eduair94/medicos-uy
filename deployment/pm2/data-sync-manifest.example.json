@@ -25,6 +25,14 @@
       "records": "REPLACE_WITH_RECORD_COUNT"
     },
     {
+      "kind": "CMU_ETHICS_PUBLIC_METADATA",
+      "manifestRelativePath": "normalized/ethics/cmu/REPLACE_WITH_SNAPSHOT_ID/manifest.json",
+      "manifestSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "payloadRelativePath": "normalized/ethics/cmu/REPLACE_WITH_SNAPSHOT_ID/cases.ndjson",
+      "payloadSha256": "REPLACE_WITH_64_CHARACTER_SHA256",
+      "records": "REPLACE_WITH_RECORD_COUNT"
+    },
+    {
       "kind": "WEB_ENRICHMENT_INTERNAL_QUARANTINE",
       "manifestRelativePath": "processed/web-enrichment/REPLACE_WITH_RUN_ID/manifest.json",
       "manifestSha256": "REPLACE_WITH_64_CHARACTER_SHA256",

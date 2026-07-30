@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertMigrationHash,
+  loadOwnerResearchMigrationPlan,
   parseOwnerResearchMigrationManifest,
   runOwnerResearchMigrations,
   sha256Text,
@@ -138,6 +139,25 @@ function callIndex(
 }
 
 describe('owner-research migration management', () => {
+  it('loads the immutable repository plan through the CMU metadata migration', async () => {
+    const plan = await loadOwnerResearchMigrationPlan();
+
+    expect(plan.map(({ id, execution }) => ({ id, execution }))).toEqual([
+      {
+        id: '0006_professional_research',
+        execution: 'BASELINE',
+      },
+      {
+        id: '0007_owner_research_read_model',
+        execution: 'MANAGED',
+      },
+      {
+        id: '0008_cmu_ethics_metadata_snapshot',
+        execution: 'MANAGED',
+      },
+    ]);
+  });
+
   it('requires one immutable baseline followed by at least one managed migration', () => {
     expect(
       parseOwnerResearchMigrationManifest({

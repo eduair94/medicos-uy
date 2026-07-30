@@ -18,3 +18,17 @@ export class OwnerResearchDataIntegrityError extends Error {
     this.name = 'OwnerResearchDataIntegrityError';
   }
 }
+
+export class InvalidOwnerResearchListQueryError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'InvalidOwnerResearchListQueryError';
+  }
+}
+
+export class InvalidOwnerResearchCursorError extends Error {
+  public constructor() {
+    super('The owner research cursor is invalid or unsupported.');
+    this.name = 'InvalidOwnerResearchCursorError';
+  }
+}

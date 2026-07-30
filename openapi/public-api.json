@@ -315,6 +315,74 @@
         "summary": "Get the latest owner-only research dossier for one professional",
         "tags": ["owner research"]
       }
+    },
+    "/v1/owner/research/professionals": {
+      "get": {
+        "description": "Lista todos los dossiers de investigación disponibles mediante paginación por cursor. Incluye candidatos no verificados, hechos oficiales, horarios publicados, referencias web y cruces éticos conservando labels, decisiones, alertas y URLs canónicas. La proyección omite secretos, HMAC, hashes, metadata interna, contenido documental y URLs de descarga de archivos.",
+        "operationId": "listOwnerProfessionalResearch",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Cantidad máxima de dossiers completos por página.",
+            "schema": { "example": 20, "type": "number" }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor opaco recibido en la página anterior; no debe interpretarse.",
+            "schema": { "maxLength": 1000, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página owner-only con dossiers completos sanitizados y candidatos explícitamente etiquetados como no verificados.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerProfessionalResearchPageResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El límite o el cursor opaco no es válido.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "401": {
+            "description": "Owner authentication is required.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "429": {
+            "description": "Se superó el límite de solicitudes.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno o dossier persistido incompatible, sin detalles sensibles.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetailsResponseDto" }
+              }
+            }
+          }
+        },
+        "summary": "List every sanitized owner research dossier",
+        "tags": ["owner research"]
+      }
     }
   },
   "info": {
@@ -970,6 +1038,109 @@
         },
         "required": ["reference", "nameMatch", "connection", "alerts"]
       },
+      "EthicsCaseDocumentResponseDto": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string" },
+          "sourceDate": { "type": "object", "nullable": true },
+          "sourceDatePrecision": { "type": "string", "enum": ["DAY"], "nullable": true },
+          "contentFetched": { "type": "boolean", "enum": [false] }
+        },
+        "required": ["label", "sourceDate", "sourceDatePrecision", "contentFetched"]
+      },
+      "EthicsCaseSourceResponseDto": {
+        "type": "object",
+        "properties": {
+          "sitemapUrl": { "type": "string", "format": "uri" },
+          "sitemapLastModified": { "type": "string", "format": "date-time", "nullable": true },
+          "robotsUrl": { "type": "string", "format": "uri" },
+          "pageMetadataOnly": { "type": "boolean", "enum": [true] }
+        },
+        "required": ["sitemapUrl", "sitemapLastModified", "robotsUrl", "pageMetadataOnly"]
+      },
+      "EthicsCaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": { "type": "number", "enum": [1] },
+          "ethicsCaseId": { "type": "string" },
+          "sourceCaseKey": { "type": "string" },
+          "publisher": { "type": "string" },
+          "tribunal": { "type": "string" },
+          "title": { "type": "string" },
+          "canonicalUrl": { "type": "string", "format": "uri" },
+          "collectionMode": { "type": "string", "enum": ["AUTOMATED_PUBLIC_METADATA_SNAPSHOT"] },
+          "visibility": {
+            "type": "string",
+            "enum": ["ORIGINAL", "ANONYMIZED", "MIXED", "UNKNOWN"]
+          },
+          "outcome": { "type": "string", "enum": ["UNKNOWN"] },
+          "finalityStatus": { "type": "string", "enum": ["UNKNOWN"] },
+          "currentnessVerified": { "type": "boolean", "enum": [false] },
+          "sourceDate": { "type": "object", "nullable": true },
+          "sourceDatePrecision": { "type": "string", "enum": ["DAY"], "nullable": true },
+          "observedRespondentNames": { "type": "array", "items": { "type": "string" } },
+          "documents": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EthicsCaseDocumentResponseDto" }
+          },
+          "firstObservedAt": { "type": "string", "format": "date-time" },
+          "lastObservedAt": { "type": "string", "format": "date-time" },
+          "contentStored": { "type": "boolean", "enum": [false] },
+          "source": { "$ref": "#/components/schemas/EthicsCaseSourceResponseDto" }
+        },
+        "required": [
+          "schemaVersion",
+          "ethicsCaseId",
+          "sourceCaseKey",
+          "publisher",
+          "tribunal",
+          "title",
+          "canonicalUrl",
+          "collectionMode",
+          "visibility",
+          "outcome",
+          "finalityStatus",
+          "currentnessVerified",
+          "sourceDate",
+          "sourceDatePrecision",
+          "observedRespondentNames",
+          "documents",
+          "firstObservedAt",
+          "lastObservedAt",
+          "contentStored",
+          "source"
+        ]
+      },
+      "EthicsCaseDecisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "identityConfirmed": { "type": "boolean", "enum": [false] },
+          "factConfirmed": { "type": "boolean", "enum": [false] },
+          "linkageDecision": { "type": "string", "enum": ["NOT_LINKED"] },
+          "publicationDecision": { "type": "string", "enum": ["NOT_PUBLISHED"] },
+          "publicExportAllowed": { "type": "boolean", "enum": [false] },
+          "requiresHumanReview": { "type": "boolean", "enum": [true] }
+        },
+        "required": [
+          "identityConfirmed",
+          "factConfirmed",
+          "linkageDecision",
+          "publicationDecision",
+          "publicExportAllowed",
+          "requiresHumanReview"
+        ]
+      },
+      "EthicsCaseCandidateResponseDto": {
+        "type": "object",
+        "properties": {
+          "ethicsCase": { "$ref": "#/components/schemas/EthicsCaseResponseDto" },
+          "observedName": { "type": "string" },
+          "nameMatch": { "$ref": "#/components/schemas/ResearchNameMatchResponseDto" },
+          "decision": { "$ref": "#/components/schemas/EthicsCaseDecisionResponseDto" },
+          "alerts": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["ethicsCase", "observedName", "nameMatch", "decision", "alerts"]
+      },
       "SourceCoverageResponseDto": {
         "type": "object",
         "properties": {
@@ -1019,6 +1190,7 @@
           "scheduleRecords": { "type": "number" },
           "webCandidates": { "type": "number" },
           "publicReferenceCandidates": { "type": "number" },
+          "ethicsCandidates": { "type": "number" },
           "publishers": { "type": "array", "items": { "type": "string" } },
           "institutionContexts": { "type": "array", "items": { "type": "string" } }
         },
@@ -1028,6 +1200,7 @@
           "scheduleRecords",
           "webCandidates",
           "publicReferenceCandidates",
+          "ethicsCandidates",
           "publishers",
           "institutionContexts"
         ]
@@ -1049,6 +1222,10 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/PublicReferenceCandidateResponseDto" }
           },
+          "ethicsCaseCandidates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EthicsCaseCandidateResponseDto" }
+          },
           "sourceCoverage": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/SourceCoverageResponseDto" }
@@ -1061,6 +1238,7 @@
           "institutionalCandidates",
           "webCandidates",
           "publicReferenceCandidates",
+          "ethicsCaseCandidates",
           "sourceCoverage",
           "signalSummary"
         ]
@@ -1073,6 +1251,8 @@
           "scheduleArtifactsChecked": { "type": "number" },
           "webEnrichmentSnapshotChecked": { "type": "boolean" },
           "curatedReferenceLedgerChecked": { "type": "boolean" },
+          "ethicsMetadataSnapshotChecked": { "type": "boolean" },
+          "ethicsCasesObserved": { "type": "number" },
           "noFindingsProvesAbsence": { "type": "boolean" }
         },
         "required": [
@@ -1081,6 +1261,8 @@
           "scheduleArtifactsChecked",
           "webEnrichmentSnapshotChecked",
           "curatedReferenceLedgerChecked",
+          "ethicsMetadataSnapshotChecked",
+          "ethicsCasesObserved",
           "noFindingsProvesAbsence"
         ]
       },
@@ -1181,6 +1363,98 @@
           "notice",
           "dossier"
         ]
+      },
+      "OwnerResearchItemLabelsResponseDto": {
+        "type": "object",
+        "properties": {
+          "associationReview": {
+            "type": "string",
+            "description": "Label conservador para cualquier asociación del dossier que no tenga confirmación humana explícita.",
+            "enum": ["UNVERIFIED_REVIEW_CANDIDATE"],
+            "example": "UNVERIFIED_REVIEW_CANDIDATE"
+          },
+          "originalSourceVerificationRequired": { "type": "boolean", "enum": [true] }
+        },
+        "required": ["associationReview", "originalSourceVerificationRequired"]
+      },
+      "OwnerProfessionalResearchListItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "professionalId": { "type": "string", "format": "uuid" },
+          "slug": { "type": "string" },
+          "analysisVersion": { "type": "string" },
+          "runStatus": { "type": "string", "enum": ["COMPLETED", "PARTIAL"] },
+          "reportId": { "type": "string" },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "queryAmbiguity": {
+            "type": "string",
+            "enum": ["NONE", "MULTIPLE_CANDIDATES", "NO_CANDIDATE"]
+          },
+          "bestFlexibilityIndex": { "type": "number", "enum": [0, 1, 2], "nullable": true },
+          "counts": { "$ref": "#/components/schemas/OwnerResearchCountsResponseDto" },
+          "notice": { "$ref": "#/components/schemas/OwnerResearchNoticeResponseDto" },
+          "dossier": { "$ref": "#/components/schemas/OwnerResearchDossierResponseDto" },
+          "labels": { "$ref": "#/components/schemas/OwnerResearchItemLabelsResponseDto" }
+        },
+        "required": [
+          "professionalId",
+          "slug",
+          "analysisVersion",
+          "runStatus",
+          "reportId",
+          "generatedAt",
+          "queryAmbiguity",
+          "bestFlexibilityIndex",
+          "counts",
+          "notice",
+          "dossier",
+          "labels"
+        ]
+      },
+      "OwnerResearchPagePaginationResponseDto": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer", "maximum": 50, "minimum": 1 },
+          "returned": { "type": "integer", "minimum": 0 },
+          "hasMore": { "type": "boolean" },
+          "nextCursor": {
+            "type": "string",
+            "description": "Cursor opaco para solicitar la página siguiente."
+          }
+        },
+        "required": ["limit", "returned", "hasMore"]
+      },
+      "OwnerResearchPageLabelsResponseDto": {
+        "type": "object",
+        "properties": {
+          "access": { "type": "string", "enum": ["OWNER_ONLY"], "example": "OWNER_ONLY" },
+          "associations": {
+            "type": "string",
+            "description": "Las asociaciones se incluyen como candidatos no verificados; deben leerse junto con las decisiones y alertas de cada candidato.",
+            "enum": ["UNVERIFIED_CANDIDATES_INCLUDED"],
+            "example": "UNVERIFIED_CANDIDATES_INCLUDED"
+          },
+          "projection": {
+            "type": "string",
+            "description": "Proyección completa del dossier sanitizado: omite HMAC, hashes, metadata interna, secretos y contenido documental.",
+            "enum": ["SANITIZED_OWNER_RESEARCH_VIEW"],
+            "example": "SANITIZED_OWNER_RESEARCH_VIEW"
+          }
+        },
+        "required": ["access", "associations", "projection"]
+      },
+      "OwnerProfessionalResearchPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Dossiers completos sanitizados. Cada asociación conserva su estado, decisión, alertas y fuente.",
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OwnerProfessionalResearchListItemResponseDto" }
+          },
+          "pagination": { "$ref": "#/components/schemas/OwnerResearchPagePaginationResponseDto" },
+          "labels": { "$ref": "#/components/schemas/OwnerResearchPageLabelsResponseDto" }
+        },
+        "required": ["items", "pagination", "labels"]
       }
     }
   },

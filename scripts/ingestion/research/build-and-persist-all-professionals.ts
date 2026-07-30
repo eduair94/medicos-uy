@@ -7,12 +7,16 @@ import { Client } from 'pg';
 
 import {
   buildProfessionalResearchView,
+  evaluateResearchPersonName,
+  isResearchEthicsCandidateNameMatch,
+  type CuratedEthicsCaseReference,
   type ProfessionalResearchCandidateView,
   type ProfessionalResearchViewV1,
   type ResearchInstitutionalLinkageCandidate,
   type ResearchMspProfessional,
   type WebEnrichmentCandidate,
 } from '../../../packages/modules/discovery/src';
+import { loadCmuEthicsSnapshot, type CmuEthicsCaseMetadata } from '../ethics/cmu-ethics-snapshot';
 
 import {
   loadLinkageSelection,
@@ -22,9 +26,9 @@ import {
   loadWebSelection,
   type InputDescriptor,
 } from './build-professional-research-view';
-import { cmuEthicsBlockedCoverage } from './restricted-source-coverage';
+import { cmuEthicsMetadataCoverage } from './restricted-source-coverage';
 
-const ANALYSIS_VERSION = 'professional-research-v1.1';
+const ANALYSIS_VERSION = 'professional-research-v1.2';
 const ANALYSIS_APPROVAL = 'STORE_PRIVATE_RESEARCH_DOSSIERS';
 const REQUIRED_DATABASE_USER = 'medicos_private_ingestor';
 const REQUIRED_DATABASE_NAME = 'medicos_catalog';
@@ -44,6 +48,7 @@ export interface ProfessionalAnalysisConfiguration {
   readonly databaseCa: string;
   readonly databaseSslServername: string;
   readonly referencesPath?: string;
+  readonly ethicsSnapshotPath: string;
   readonly batchSize: number;
   readonly maxAttempts: number;
   readonly leaseMinutes: number;
@@ -86,6 +91,11 @@ interface AnalysisInputs {
   readonly schedules: Awaited<ReturnType<typeof loadSchedules>>['schedules'];
   readonly scheduleDescriptors: readonly InputDescriptor[];
   readonly references: Awaited<ReturnType<typeof loadReferences>>['references'];
+  readonly ethicsCases: readonly CuratedEthicsCaseReference[];
+  readonly ethicsCasesByProfessionalId: ReadonlyMap<string, readonly CuratedEthicsCaseReference[]>;
+  readonly ethicsManifestSha256: string;
+  readonly ethicsSemanticSha256: string;
+  readonly ethicsPolicyReviewedAt: string;
   readonly checkedScheduleArtifacts: number;
   readonly webEnrichmentSnapshotChecked: boolean;
   readonly curatedReferenceLedgerChecked: boolean;
@@ -122,7 +132,8 @@ interface DossierRow {
 
 interface CandidateRow {
   readonly internal_hmac_id: string;
-  readonly candidate_kind: 'INSTITUTIONAL_LINKAGE' | 'WEB_ENRICHMENT' | 'PUBLIC_REFERENCE';
+  readonly candidate_kind:
+    'INSTITUTIONAL_LINKAGE' | 'WEB_ENRICHMENT' | 'PUBLIC_REFERENCE' | 'ETHICS_CASE_REFERENCE';
   readonly candidate_key: string;
   readonly publisher: string | null;
   readonly institution: string | null;
@@ -132,9 +143,39 @@ interface CandidateRow {
   readonly payload: UnknownRecord;
 }
 
+interface EthicsCaseRow {
+  readonly ethics_case_id: string;
+  readonly publisher: string;
+  readonly source_case_key: string;
+  readonly tribunal: string;
+  readonly title: string;
+  readonly canonical_url: string;
+  readonly collection_mode: 'AUTOMATED_PUBLIC_METADATA_SNAPSHOT';
+  readonly visibility: 'ORIGINAL' | 'ANONYMIZED' | 'MIXED' | 'UNKNOWN';
+  readonly outcome: 'UNKNOWN';
+  readonly finality_status: 'UNKNOWN';
+  readonly currentness_verified: false;
+  readonly source_date: string | null;
+  readonly source_date_precision: 'DAY' | null;
+  readonly source_metadata: UnknownRecord;
+  readonly content_stored: false;
+  readonly first_observed_at: string;
+  readonly last_observed_at: string;
+}
+
+interface EthicsCandidateRow {
+  readonly internal_hmac_id: string;
+  readonly ethics_case_id: string;
+  readonly observed_name: string;
+  readonly match_kind: 'EXACT_NORMALIZED_NAME' | 'EXACT_TOKEN_MULTISET' | 'PARTIAL_TOKEN_SUBSET';
+  readonly match_flexibility_index: 0 | 1;
+  readonly match_rationale: readonly string[];
+}
+
 interface PreparedDossier {
   readonly dossier: DossierRow;
   readonly candidates: readonly CandidateRow[];
+  readonly ethicsCandidates: readonly EthicsCandidateRow[];
 }
 
 function requiredEnvironmentValue(environment: NodeJS.ProcessEnv, name: string): string {
@@ -224,7 +265,7 @@ export async function loadProfessionalAnalysisConfiguration(
   }
   if (merged['CMU_ETHICS_FETCH_ENABLED']?.trim().toLowerCase() === 'true') {
     throw new Error(
-      'CMU_ETHICS_FETCH_ENABLED=true is prohibited: the official source blocks automated access.',
+      'CMU_ETHICS_FETCH_ENABLED=true is prohibited in the analyzer: run the bounded metadata collector separately and provide its verified snapshot.',
     );
   }
   const snapshotId = requiredEnvironmentValue(merged, 'PROFESSIONAL_ANALYSIS_EXPECTED_SNAPSHOT_ID');
@@ -254,6 +295,13 @@ export async function loadProfessionalAnalysisConfiguration(
   }
   const configuredDataDirectory = merged['DATA_INGESTION_DIR']?.trim();
   const configuredReferencesPath = merged['PROFESSIONAL_RESEARCH_REFERENCES_PATH']?.trim();
+  const ethicsSnapshotPath = resolve(
+    requiredEnvironmentValue(merged, 'PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH'),
+  );
+  const ethicsSnapshotMetadata = await stat(ethicsSnapshotPath);
+  if (!ethicsSnapshotMetadata.isDirectory()) {
+    throw new Error('PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH must point to a snapshot directory.');
+  }
   return {
     approval: ANALYSIS_APPROVAL,
     dataDirectory: await realpath(
@@ -272,6 +320,7 @@ export async function loadProfessionalAnalysisConfiguration(
     ...(configuredReferencesPath === undefined || configuredReferencesPath.length === 0
       ? {}
       : { referencesPath: configuredReferencesPath }),
+    ethicsSnapshotPath,
     batchSize: parseBoundedInteger(
       merged['PROFESSIONAL_ANALYSIS_BATCH_SIZE'],
       100,
@@ -346,24 +395,92 @@ function groupByProfessionalId<T>(
   return grouped;
 }
 
+function toCuratedEthicsCaseReference(
+  ethicsCase: CmuEthicsCaseMetadata,
+): CuratedEthicsCaseReference {
+  return {
+    schemaVersion: 1,
+    ethicsCaseId: ethicsCase.ethicsCaseId,
+    sourceCaseKey: ethicsCase.sourceCaseKey,
+    publisher: ethicsCase.sourceMetadata.publisher,
+    tribunal: ethicsCase.sourceMetadata.tribunal,
+    title: ethicsCase.title,
+    canonicalUrl: ethicsCase.canonicalUrl,
+    collectionMode: ethicsCase.sourceMetadata.collectionMode,
+    visibility: ethicsCase.visibility,
+    outcome: ethicsCase.outcome,
+    finalityStatus: ethicsCase.finalityStatus,
+    currentnessVerified: ethicsCase.sourceMetadata.currentnessVerified,
+    sourceDate: ethicsCase.sourceDate,
+    sourceDatePrecision: ethicsCase.sourceDatePrecision,
+    observedRespondentNames: ethicsCase.respondentNames,
+    documents: ethicsCase.documents.map((document) => ({
+      label: document.label,
+      sourceDate: document.date,
+      sourceDatePrecision: document.date === null ? null : 'DAY',
+      contentFetched: false,
+    })),
+    firstObservedAt: ethicsCase.firstObservedAt,
+    lastObservedAt: ethicsCase.lastObservedAt,
+    contentStored: ethicsCase.sourceMetadata.contentStored,
+    source: {
+      sitemapUrl: ethicsCase.sourceMetadata.sitemapUrl,
+      sitemapLastModified: ethicsCase.sourceMetadata.sitemapLastModified,
+      robotsUrl: ethicsCase.sourceMetadata.robotsUrl,
+      pageMetadataOnly: ethicsCase.sourceMetadata.pageMetadataOnly,
+    },
+  };
+}
+
+export function groupEthicsCasesByProfessionalId(
+  professionals: readonly ResearchMspProfessional[],
+  ethicsCases: readonly CuratedEthicsCaseReference[],
+): ReadonlyMap<string, readonly CuratedEthicsCaseReference[]> {
+  const grouped = new Map<string, Map<string, CuratedEthicsCaseReference>>();
+  for (const ethicsCase of ethicsCases) {
+    for (const observedName of ethicsCase.observedRespondentNames) {
+      for (const professional of professionals) {
+        const match = evaluateResearchPersonName(professional.fullName, observedName);
+        if (match === null || !isResearchEthicsCandidateNameMatch(match)) {
+          continue;
+        }
+        const cases =
+          grouped.get(professional.linkageId) ?? new Map<string, CuratedEthicsCaseReference>();
+        cases.set(ethicsCase.ethicsCaseId, ethicsCase);
+        grouped.set(professional.linkageId, cases);
+      }
+    }
+  }
+
+  return new Map(
+    [...grouped.entries()].map(([professionalId, cases]) => [
+      professionalId,
+      [...cases.values()].sort((left, right) =>
+        left.ethicsCaseId.localeCompare(right.ethicsCaseId),
+      ),
+    ]),
+  );
+}
+
 async function loadAnalysisInputs(
   configuration: ProfessionalAnalysisConfiguration,
   now: Date,
 ): Promise<AnalysisInputs> {
-  const [msp, linkage, web, references] = await Promise.all([
+  const [msp, linkage, web, references, ethicsSnapshot] = await Promise.all([
     loadMspSelection(configuration.dataDirectory, undefined),
     loadLinkageSelection(configuration.dataDirectory, undefined),
     loadWebSelection(configuration.dataDirectory, now),
     loadReferences(configuration.dataDirectory, configuration.referencesPath),
+    loadCmuEthicsSnapshot(configuration.ethicsSnapshotPath),
   ]);
   const schedules = await loadSchedules(configuration.dataDirectory, linkage, linkage.candidates);
+  const ethicsCases = ethicsSnapshot.cases.map(toCuratedEthicsCaseReference);
   const professionalById = new Map(
     msp.professionals.map((professional) => [professional.linkageId, professional]),
   );
   if (professionalById.size !== msp.professionals.length) {
     throw new Error('MSP input contains duplicate opaque professional identifiers.');
   }
-  const sourceCoverage = cmuEthicsBlockedCoverage();
   const inputFingerprint = sha256(
     canonicalJson({
       analysisVersion: ANALYSIS_VERSION,
@@ -384,7 +501,13 @@ async function loadAnalysisInputs(
               records: references.references.length,
               sha256: sha256(references.content),
             },
-      restrictedSources: [sourceCoverage],
+      ethicsMetadata: {
+        records: ethicsSnapshot.records,
+        semanticSha256: ethicsSnapshot.semanticSha256,
+        manifestSha256: ethicsSnapshot.manifestSha256,
+        policyReviewedAt: ethicsSnapshot.policyReviewedAt,
+      },
+      restrictedSources: [cmuEthicsMetadataCoverage(ethicsSnapshot.policyReviewedAt)],
     }),
   );
   return {
@@ -399,6 +522,11 @@ async function loadAnalysisInputs(
     schedules: schedules.schedules,
     scheduleDescriptors: schedules.descriptors,
     references: references.references,
+    ethicsCases,
+    ethicsCasesByProfessionalId: groupEthicsCasesByProfessionalId(msp.professionals, ethicsCases),
+    ethicsManifestSha256: ethicsSnapshot.manifestSha256,
+    ethicsSemanticSha256: ethicsSnapshot.semanticSha256,
+    ethicsPolicyReviewedAt: ethicsSnapshot.policyReviewedAt,
     checkedScheduleArtifacts: schedules.descriptors.length,
     webEnrichmentSnapshotChecked: web !== undefined,
     curatedReferenceLedgerChecked: references.content !== undefined,
@@ -452,7 +580,182 @@ function candidateRows(
       payload,
     };
   });
-  return [...institutional, ...web, ...publicReferences];
+  const ethicsCases: CandidateRow[] = candidate.ethicsCaseCandidates.map((value) => {
+    const payload = value as unknown as UnknownRecord;
+    return {
+      internal_hmac_id: internalHmacId,
+      candidate_kind: 'ETHICS_CASE_REFERENCE',
+      candidate_key: value.ethicsCase.ethicsCaseId,
+      publisher: value.ethicsCase.publisher,
+      institution: null,
+      canonical_url: value.ethicsCase.canonicalUrl,
+      match_flexibility_index: value.nameMatch.flexibilityIndex,
+      payload_sha256: sha256(canonicalJson(payload)),
+      payload,
+    };
+  });
+  return [...institutional, ...web, ...publicReferences, ...ethicsCases];
+}
+
+function ethicsCaseRows(cases: readonly CuratedEthicsCaseReference[]): readonly EthicsCaseRow[] {
+  return cases.map((ethicsCase) => ({
+    ethics_case_id: ethicsCase.ethicsCaseId,
+    publisher: ethicsCase.publisher,
+    source_case_key: ethicsCase.sourceCaseKey,
+    tribunal: ethicsCase.tribunal,
+    title: ethicsCase.title,
+    canonical_url: ethicsCase.canonicalUrl,
+    collection_mode: ethicsCase.collectionMode,
+    visibility: ethicsCase.visibility,
+    outcome: ethicsCase.outcome,
+    finality_status: ethicsCase.finalityStatus,
+    currentness_verified: ethicsCase.currentnessVerified,
+    source_date: ethicsCase.sourceDate,
+    source_date_precision: ethicsCase.sourceDatePrecision,
+    source_metadata: {
+      source: ethicsCase.source,
+      documents: ethicsCase.documents,
+      observedRespondentNames: ethicsCase.observedRespondentNames,
+      safeguards: {
+        pageMetadataOnly: true,
+        pdfFetched: false,
+        documentContentFetched: false,
+        contentStored: false,
+        automaticIdentityConfirmation: false,
+        automaticFactConfirmation: false,
+        publicExportAllowed: false,
+      },
+    },
+    content_stored: ethicsCase.contentStored,
+    first_observed_at: ethicsCase.firstObservedAt,
+    last_observed_at: ethicsCase.lastObservedAt,
+  }));
+}
+
+async function persistEthicsCases(
+  client: Client,
+  cases: readonly CuratedEthicsCaseReference[],
+): Promise<void> {
+  const rows = ethicsCaseRows(cases);
+  if (rows.length === 0) {
+    throw new Error('The CMU ethics metadata snapshot must contain at least one case.');
+  }
+  await client.query('BEGIN');
+  try {
+    await client.query(
+      `
+        INSERT INTO research_private.ethics_case (
+          ethics_case_id,
+          publisher,
+          source_case_key,
+          tribunal,
+          title,
+          canonical_url,
+          collection_mode,
+          visibility,
+          outcome,
+          finality_status,
+          currentness_verified,
+          source_date,
+          source_date_precision,
+          document_sha256,
+          source_metadata,
+          content_stored,
+          first_observed_at,
+          last_observed_at
+        )
+        SELECT
+          value.ethics_case_id,
+          value.publisher,
+          value.source_case_key,
+          value.tribunal,
+          value.title,
+          value.canonical_url,
+          value.collection_mode,
+          value.visibility,
+          value.outcome,
+          value.finality_status,
+          value.currentness_verified,
+          value.source_date,
+          value.source_date_precision,
+          NULL,
+          value.source_metadata,
+          value.content_stored,
+          value.first_observed_at,
+          value.last_observed_at
+        FROM jsonb_to_recordset($1::jsonb) AS value (
+          ethics_case_id varchar(96),
+          publisher varchar(240),
+          source_case_key varchar(240),
+          tribunal varchar(240),
+          title varchar(500),
+          canonical_url varchar(2048),
+          collection_mode varchar(48),
+          visibility varchar(16),
+          outcome varchar(16),
+          finality_status varchar(24),
+          currentness_verified boolean,
+          source_date varchar(10),
+          source_date_precision varchar(8),
+          source_metadata jsonb,
+          content_stored boolean,
+          first_observed_at timestamptz,
+          last_observed_at timestamptz
+        )
+        ON CONFLICT (ethics_case_id)
+        DO UPDATE SET
+          title = excluded.title,
+          canonical_url = excluded.canonical_url,
+          visibility = excluded.visibility,
+          source_date = excluded.source_date,
+          source_date_precision = excluded.source_date_precision,
+          source_metadata = excluded.source_metadata,
+          first_observed_at = LEAST(
+            research_private.ethics_case.first_observed_at,
+            excluded.first_observed_at
+          ),
+          last_observed_at = GREATEST(
+            research_private.ethics_case.last_observed_at,
+            excluded.last_observed_at
+          ),
+          updated_at = now()
+        WHERE research_private.ethics_case.publisher = excluded.publisher
+          AND research_private.ethics_case.source_case_key = excluded.source_case_key
+          AND research_private.ethics_case.collection_mode = excluded.collection_mode
+      `,
+      [JSON.stringify(rows)],
+    );
+    const persisted = await client.query<{
+      readonly ethics_case_id: string;
+      readonly source_case_key: string;
+    }>(
+      `
+        SELECT ethics_case_id, source_case_key
+        FROM research_private.ethics_case
+        WHERE ethics_case_id = ANY($1::varchar[])
+      `,
+      [rows.map(({ ethics_case_id: ethicsCaseId }) => ethicsCaseId)],
+    );
+    const expected = new Map(
+      rows.map(({ ethics_case_id: ethicsCaseId, source_case_key: sourceCaseKey }) => [
+        ethicsCaseId,
+        sourceCaseKey,
+      ]),
+    );
+    if (
+      persisted.rows.length !== rows.length ||
+      persisted.rows.some(
+        ({ ethics_case_id: ethicsCaseId, source_case_key: sourceCaseKey }) =>
+          expected.get(ethicsCaseId) !== sourceCaseKey,
+      )
+    ) {
+      throw new Error('An immutable CMU ethics-case identity collision was detected.');
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
 }
 
 export function buildPersistableDossier(
@@ -476,10 +779,12 @@ export function buildPersistableDossier(
     schedulesBySourceRecord: inputs.schedules,
     webCandidates: inputs.webByProfessionalId.get(professional.linkageId) ?? [],
     publicReferences: inputs.references,
-    sourceCoverage: [cmuEthicsBlockedCoverage()],
+    ethicsCases: inputs.ethicsCasesByProfessionalId.get(professional.linkageId) ?? [],
+    sourceCoverage: [cmuEthicsMetadataCoverage(inputs.ethicsPolicyReviewedAt)],
     checkedScheduleArtifacts: inputs.checkedScheduleArtifacts,
     webEnrichmentSnapshotChecked: inputs.webEnrichmentSnapshotChecked,
     curatedReferenceLedgerChecked: inputs.curatedReferenceLedgerChecked,
+    ethicsMetadataSnapshotChecked: true,
   });
   const candidate = view.candidates[0];
   if (
@@ -503,11 +808,19 @@ export function buildPersistableDossier(
       schedule_record_count: signal.scheduleRecords,
       web_candidate_count: signal.webCandidates,
       public_reference_candidate_count: signal.publicReferenceCandidates,
-      ethics_candidate_count: 0,
+      ethics_candidate_count: signal.ethicsCandidates,
       dossier_sha256: sha256(canonicalJson(view)),
       research_view: view,
     },
     candidates: candidateRows(professional.linkageId, candidate),
+    ethicsCandidates: candidate.ethicsCaseCandidates.map((value) => ({
+      internal_hmac_id: professional.linkageId,
+      ethics_case_id: value.ethicsCase.ethicsCaseId,
+      observed_name: value.observedName,
+      match_kind: value.nameMatch.kind,
+      match_flexibility_index: value.nameMatch.flexibilityIndex,
+      match_rationale: value.alerts,
+    })),
   };
 }
 
@@ -777,6 +1090,26 @@ async function persistBatch(
 ): Promise<number> {
   const dossiers = prepared.map(({ dossier }) => dossier);
   const candidates = prepared.flatMap(({ candidates: rows }) => rows);
+  const ethicsCandidates = prepared.flatMap(({ ethicsCandidates: rows }) =>
+    rows.map((row) => {
+      const candidateSha256 = sha256(
+        canonicalJson({
+          runId,
+          internalHmacId: row.internal_hmac_id,
+          ethicsCaseId: row.ethics_case_id,
+          observedName: row.observed_name,
+          matchKind: row.match_kind,
+          matchFlexibilityIndex: row.match_flexibility_index,
+          matchRationale: row.match_rationale,
+        }),
+      );
+      return {
+        ...row,
+        candidate_id: `ethics_candidate_v1_${candidateSha256}`,
+        candidate_sha256: candidateSha256,
+      };
+    }),
+  );
   await client.query('BEGIN');
   try {
     await client.query(
@@ -881,6 +1214,54 @@ async function persistBatch(
           DO NOTHING
         `,
         [runId, JSON.stringify(candidates)],
+      );
+    }
+    if (ethicsCandidates.length > 0) {
+      await client.query(
+        `
+          INSERT INTO research_private.professional_ethics_candidate (
+            candidate_id,
+            run_id,
+            internal_hmac_id,
+            ethics_case_id,
+            observed_name,
+            match_kind,
+            match_flexibility_index,
+            candidate_status,
+            match_rationale,
+            candidate_sha256,
+            identity_confirmed,
+            fact_confirmed,
+            requires_human_review
+          )
+          SELECT
+            value.candidate_id,
+            $1,
+            value.internal_hmac_id,
+            value.ethics_case_id,
+            value.observed_name,
+            value.match_kind,
+            value.match_flexibility_index,
+            'UNVERIFIED_REVIEW_CANDIDATE',
+            value.match_rationale,
+            value.candidate_sha256,
+            false,
+            false,
+            true
+          FROM jsonb_to_recordset($2::jsonb) AS value (
+            candidate_id varchar(96),
+            internal_hmac_id varchar(75),
+            ethics_case_id varchar(96),
+            observed_name varchar(240),
+            match_kind varchar(40),
+            match_flexibility_index smallint,
+            match_rationale jsonb,
+            candidate_sha256 varchar(64)
+          )
+          ON CONFLICT (run_id, internal_hmac_id, ethics_case_id)
+          DO NOTHING
+        `,
+        [runId, JSON.stringify(ethicsCandidates)],
       );
     }
     const hashes = await client.query<{
@@ -1126,6 +1507,7 @@ export async function runAllProfessionalAnalysis(
       total: inputs.professionals.length,
     });
     await verifySnapshotIdentitySet(client, configuration, inputs);
+    await persistEthicsCases(client, inputs.ethicsCases);
     const run = await initializeRun(client, configuration, inputFingerprint);
     if (run.status === 'COMPLETED') {
       report({ event: 'analysis_run_reused', runId, total: inputs.professionals.length });

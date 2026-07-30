@@ -333,7 +333,11 @@ export const professionalResearchDossierTable = researchPrivateSchema.table(
           ${table.webCandidateCount}::text
         and ${table.researchView} #>>
           '{candidates,0,signalSummary,publicReferenceCandidates}' =
-          ${table.publicReferenceCandidateCount}::text`,
+          ${table.publicReferenceCandidateCount}::text
+        and coalesce(
+          ${table.researchView} #>> '{candidates,0,signalSummary,ethicsCandidates}',
+          '0'
+        ) = ${table.ethicsCandidateCount}::text`,
     ),
   ],
 );
@@ -447,7 +451,7 @@ export const professionalResearchEthicsCaseTable = researchPrivateSchema.table(
     title: varchar('title', { length: 500 }).notNull(),
     canonicalUrl: varchar('canonical_url', { length: 2048 }).notNull(),
     collectionMode: varchar('collection_mode', { length: 48 })
-      .$type<'MANUALLY_CURATED_UNVERIFIED_CURRENTNESS'>()
+      .$type<'MANUALLY_CURATED_UNVERIFIED_CURRENTNESS' | 'AUTOMATED_PUBLIC_METADATA_SNAPSHOT'>()
       .default('MANUALLY_CURATED_UNVERIFIED_CURRENTNESS')
       .notNull(),
     visibility: varchar('visibility', { length: 16 })
@@ -508,7 +512,10 @@ export const professionalResearchEthicsCaseTable = researchPrivateSchema.table(
     check('ck_research_ethics_case_url', sql`${table.canonicalUrl} ~ '^https://'`),
     check(
       'ck_research_ethics_case_collection_mode',
-      sql`${table.collectionMode} = 'MANUALLY_CURATED_UNVERIFIED_CURRENTNESS'`,
+      sql`${table.collectionMode} in (
+        'MANUALLY_CURATED_UNVERIFIED_CURRENTNESS',
+        'AUTOMATED_PUBLIC_METADATA_SNAPSHOT'
+      )`,
     ),
     check(
       'ck_research_ethics_case_visibility',
@@ -554,6 +561,27 @@ export const professionalResearchEthicsCaseTable = researchPrivateSchema.table(
     ),
     check('ck_research_ethics_case_content', sql`${table.contentStored} = false`),
     check(
+      'ck_research_ethics_case_automated_metadata',
+      sql`${table.collectionMode} <> 'AUTOMATED_PUBLIC_METADATA_SNAPSHOT'
+        or (
+          ${table.outcome} = 'UNKNOWN'
+          and ${table.finalityStatus} = 'UNKNOWN'
+          and ${table.currentnessVerified} = false
+          and ${table.documentSha256} is null
+          and ${table.contentStored} = false
+          and ${table.sourceMetadata} @> '{
+            "safeguards": {
+              "pageMetadataOnly": true,
+              "pdfFetched": false,
+              "documentContentFetched": false,
+              "automaticIdentityConfirmation": false,
+              "automaticFactConfirmation": false,
+              "publicExportAllowed": false
+            }
+          }'::jsonb
+        )`,
+    ),
+    check(
       'ck_research_ethics_case_observation_order',
       sql`${table.lastObservedAt} >= ${table.firstObservedAt}`,
     ),
@@ -573,12 +601,12 @@ export const professionalResearchEthicsCandidateTable = researchPrivateSchema.ta
       }),
     observedName: varchar('observed_name', { length: 240 }).notNull(),
     matchKind: varchar('match_kind', { length: 40 })
-      .$type<'EXACT_NORMALIZED_NAME' | 'EXACT_TOKEN_MULTISET'>()
+      .$type<'EXACT_NORMALIZED_NAME' | 'EXACT_TOKEN_MULTISET' | 'PARTIAL_TOKEN_SUBSET'>()
       .notNull(),
-    matchFlexibilityIndex: smallint('match_flexibility_index').$type<0>().notNull(),
+    matchFlexibilityIndex: smallint('match_flexibility_index').$type<0 | 1>().notNull(),
     candidateStatus: varchar('candidate_status', { length: 40 })
-      .$type<'CANDIDATE_EXACT_REVIEW_REQUIRED'>()
-      .default('CANDIDATE_EXACT_REVIEW_REQUIRED')
+      .$type<'UNVERIFIED_REVIEW_CANDIDATE'>()
+      .default('UNVERIFIED_REVIEW_CANDIDATE')
       .notNull(),
     matchRationale: jsonb('match_rationale').$type<readonly string[]>().notNull(),
     candidateSha256: varchar('candidate_sha256', { length: 64 }).notNull(),
@@ -617,22 +645,29 @@ export const professionalResearchEthicsCandidateTable = researchPrivateSchema.ta
     ),
     check(
       'ck_research_professional_ethics_candidate_name',
-      sql`length(trim(${table.observedName})) > 0`,
+      sql`trim(${table.observedName}) ~ '^[^[:space:]]+[[:space:]]+[^[:space:]]+'`,
     ),
     check(
       'ck_research_professional_ethics_candidate_match_kind',
       sql`${table.matchKind} in (
         'EXACT_NORMALIZED_NAME',
-        'EXACT_TOKEN_MULTISET'
+        'EXACT_TOKEN_MULTISET',
+        'PARTIAL_TOKEN_SUBSET'
       )`,
     ),
     check(
       'ck_research_professional_ethics_candidate_flexibility',
-      sql`${table.matchFlexibilityIndex} = 0`,
+      sql`(
+        ${table.matchKind} in ('EXACT_NORMALIZED_NAME', 'EXACT_TOKEN_MULTISET')
+        and ${table.matchFlexibilityIndex} = 0
+      ) or (
+        ${table.matchKind} = 'PARTIAL_TOKEN_SUBSET'
+        and ${table.matchFlexibilityIndex} = 1
+      )`,
     ),
     check(
       'ck_research_professional_ethics_candidate_status',
-      sql`${table.candidateStatus} = 'CANDIDATE_EXACT_REVIEW_REQUIRED'`,
+      sql`${table.candidateStatus} = 'UNVERIFIED_REVIEW_CANDIDATE'`,
     ),
     check(
       'ck_research_professional_ethics_candidate_rationale',

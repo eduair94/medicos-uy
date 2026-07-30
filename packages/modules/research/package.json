@@ -25,6 +25,8 @@
     "@nestjs/common": "catalog:",
     "@nestjs/config": "catalog:",
     "@nestjs/swagger": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",

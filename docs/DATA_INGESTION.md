@@ -26,11 +26,17 @@ responsabilidad ni firmeza de una decisión judicial.
 | SMI                 | [Horarios médicos](https://www.smi.com.uy/mvdcms/Cartelera-Medica/Horarios-medicos-uc98)                          | Médico, especialidad, sede, días, horas y observaciones | Cartelera de consulta; no son cupos disponibles                           |
 | Médica Uruguaya     | [Cartelera médica](https://www.medicauruguaya.com.uy/mvdcaad/acasasadheridas.aspx)                                | Médico, especialidad, sede, días, horas y frecuencia    | Cartelera de consulta; no son cupos disponibles                           |
 | Hospital Británico  | [Horarios de consulta](https://www.hospitalbritanico.org.uy/medicos_horarios_de_consulta_medica.php)              | Médico, especialidad, clínica, día y horario            | Cartelera de consulta; no son cupos disponibles                           |
+| Colegio Médico      | [Sitemap de fallos](https://www.colegiomedico.org.uy/fallos-sitemap.xml)                                          | Título, clave, fecha, URL y nombre visible del caso     | Metadatos; no demuestra identidad, resultado, firmeza ni sanción          |
 
 También se relevaron COSEM, MP, BlueCross, CAMCEL y varias instituciones del interior. Se agregan
 por etapas después de validar condiciones de reutilización, estabilidad técnica y semántica de
 cada fuente. No se rastrean los endpoints de horarios del Círculo Católico porque su `robots.txt`
 los excluye expresamente.
+
+El recolector del Colegio Médico verifica primero una huella revisada de `robots.txt`, omite el
+índice y cualquier ruta/PDF excluido, y sólo visita páginas `/fallos/<slug>/` permitidas que estén
+en el sitemap específico. No guarda HTML ni enlaces de descarga. Un cambio de política aborta la
+ejecución; nunca se resuelve deshabilitando esa verificación.
 
 ## Resultado del snapshot factual exhaustivo
 
@@ -63,7 +69,7 @@ Española.
 ```text
 data/
   raw/          # respuestas originales y bundles CAAD autocontenidos; ignorados por Git
-  normalized/   # lotes transitorios de índices/noticias; ignorados por Git
+  normalized/   # índices/noticias y snapshots CMU de metadatos; ignorados por Git
   processed/    # NDJSON normalizado de MSP, CASMU, HB y linkage; ignorado por Git
   manifests/    # conteos y hashes sin datos personales; versionable
 ```
@@ -84,10 +90,18 @@ pnpm.cmd data:ingest:smi
 pnpm.cmd data:ingest:medica-uruguaya
 pnpm.cmd data:ingest:hospital-britanico
 pnpm.cmd data:ingest:news-indexes
+pnpm.cmd data:ingest:cmu-ethics
 pnpm.cmd data:link:candidates
 pnpm.cmd data:link:news-candidates
 pnpm.cmd data:build:directory
 ```
+
+`data:ingest:cmu-ethics` crea por defecto un directorio inmutable
+`<DATA_INGESTION_DIR>/normalized/ethics/cmu/snapshot-<timestamp>` con `manifest.json` y
+`cases.ndjson`. `CMU_ETHICS_OUTPUT_DIR` permite fijar otra ruta sólo si permanece dentro de la raíz
+de datos; una ruta ya existente no se sobrescribe. En producción no se fija manualmente: el
+wrapper PM2 genera la ruta, ejecuta el recolector y pasa el directorio terminado mediante
+`PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH`.
 
 `data:ingest:news-indexes` consulta solamente índices públicos oficiales: RSS
 home/nacional/salud de El Observador y RSS destacados/noticias de Montevideo Portal. El sitemap de

@@ -2,7 +2,8 @@ import {
   InvalidOwnerResearchQueryError,
   OwnerResearchNotFoundError,
 } from '../errors/owner-research.error';
-import { sanitizeOwnerResearchDossier } from '../models/owner-research-read-model';
+
+import { mapOwnerProfessionalResearch } from './map-owner-professional-research';
 
 import type { OwnerProfessionalResearch } from '../models/owner-research-read-model';
 import type { OwnerResearchLookup, OwnerResearchReader } from '../ports/owner-research-reader.port';
@@ -42,19 +43,6 @@ export class GetOwnerProfessionalResearch {
       throw new OwnerResearchNotFoundError();
     }
 
-    const { researchView, ...metadata } = record;
-
-    return {
-      ...metadata,
-      notice: {
-        associationsAreUnconfirmedCandidates: true,
-        sourceDeclaredSpecialtyIsNotMspCredential: true,
-        publishedScheduleIsNotRealtimeAvailability: true,
-        absenceOfFindingsDoesNotProveAbsence: true,
-        verifyWithOriginalSource: true,
-        text: 'Las asociaciones son candidatos de investigación no confirmados. La especialidad es una etiqueta declarada por la institución, no una credencial del MSP. Los horarios publicados pueden cambiar y deben verificarse en la fuente original.',
-      },
-      dossier: sanitizeOwnerResearchDossier(researchView),
-    };
+    return mapOwnerProfessionalResearch(record);
   }
 }

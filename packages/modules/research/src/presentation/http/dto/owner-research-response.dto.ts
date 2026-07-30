@@ -587,6 +587,201 @@ class PublicReferenceCandidateResponseDto {
   public readonly alerts!: readonly string[];
 }
 
+class EthicsCaseDocumentResponseDto {
+  @ApiProperty()
+  public readonly label!: string;
+
+  @ApiProperty({
+    nullable: true,
+  })
+  public readonly sourceDate!: string | null;
+
+  @ApiProperty({
+    enum: ['DAY'],
+    nullable: true,
+  })
+  public readonly sourceDatePrecision!: 'DAY' | null;
+
+  @ApiProperty({
+    enum: [false],
+  })
+  public readonly contentFetched!: false;
+}
+
+class EthicsCaseSourceResponseDto {
+  @ApiProperty({
+    format: 'uri',
+  })
+  public readonly sitemapUrl!: string;
+
+  @ApiProperty({
+    format: 'date-time',
+    nullable: true,
+    type: String,
+  })
+  public readonly sitemapLastModified!: string | null;
+
+  @ApiProperty({
+    format: 'uri',
+  })
+  public readonly robotsUrl!: string;
+
+  @ApiProperty({
+    enum: [true],
+  })
+  public readonly pageMetadataOnly!: true;
+}
+
+class EthicsCaseResponseDto {
+  @ApiProperty({
+    enum: [1],
+  })
+  public readonly schemaVersion!: 1;
+
+  @ApiProperty()
+  public readonly ethicsCaseId!: string;
+
+  @ApiProperty()
+  public readonly sourceCaseKey!: string;
+
+  @ApiProperty()
+  public readonly publisher!: string;
+
+  @ApiProperty()
+  public readonly tribunal!: string;
+
+  @ApiProperty()
+  public readonly title!: string;
+
+  @ApiProperty({
+    format: 'uri',
+  })
+  public readonly canonicalUrl!: string;
+
+  @ApiProperty({
+    enum: ['AUTOMATED_PUBLIC_METADATA_SNAPSHOT'],
+  })
+  public readonly collectionMode!: string;
+
+  @ApiProperty({
+    enum: ['ORIGINAL', 'ANONYMIZED', 'MIXED', 'UNKNOWN'],
+  })
+  public readonly visibility!: string;
+
+  @ApiProperty({
+    enum: ['UNKNOWN'],
+  })
+  public readonly outcome!: 'UNKNOWN';
+
+  @ApiProperty({
+    enum: ['UNKNOWN'],
+  })
+  public readonly finalityStatus!: 'UNKNOWN';
+
+  @ApiProperty({
+    enum: [false],
+  })
+  public readonly currentnessVerified!: false;
+
+  @ApiProperty({
+    nullable: true,
+  })
+  public readonly sourceDate!: string | null;
+
+  @ApiProperty({
+    enum: ['DAY'],
+    nullable: true,
+  })
+  public readonly sourceDatePrecision!: 'DAY' | null;
+
+  @ApiProperty({
+    type: [String],
+  })
+  public readonly observedRespondentNames!: readonly string[];
+
+  @ApiProperty({
+    type: [EthicsCaseDocumentResponseDto],
+  })
+  public readonly documents!: readonly EthicsCaseDocumentResponseDto[];
+
+  @ApiProperty({
+    format: 'date-time',
+  })
+  public readonly firstObservedAt!: string;
+
+  @ApiProperty({
+    format: 'date-time',
+  })
+  public readonly lastObservedAt!: string;
+
+  @ApiProperty({
+    enum: [false],
+  })
+  public readonly contentStored!: false;
+
+  @ApiProperty({
+    type: EthicsCaseSourceResponseDto,
+  })
+  public readonly source!: EthicsCaseSourceResponseDto;
+}
+
+class EthicsCaseDecisionResponseDto {
+  @ApiProperty({
+    enum: [false],
+  })
+  public readonly identityConfirmed!: false;
+
+  @ApiProperty({
+    enum: [false],
+  })
+  public readonly factConfirmed!: false;
+
+  @ApiProperty({
+    enum: ['NOT_LINKED'],
+  })
+  public readonly linkageDecision!: 'NOT_LINKED';
+
+  @ApiProperty({
+    enum: ['NOT_PUBLISHED'],
+  })
+  public readonly publicationDecision!: 'NOT_PUBLISHED';
+
+  @ApiProperty({
+    enum: [false],
+  })
+  public readonly publicExportAllowed!: false;
+
+  @ApiProperty({
+    enum: [true],
+  })
+  public readonly requiresHumanReview!: true;
+}
+
+class EthicsCaseCandidateResponseDto {
+  @ApiProperty({
+    type: EthicsCaseResponseDto,
+  })
+  public readonly ethicsCase!: EthicsCaseResponseDto;
+
+  @ApiProperty()
+  public readonly observedName!: string;
+
+  @ApiProperty({
+    type: ResearchNameMatchResponseDto,
+  })
+  public readonly nameMatch!: ResearchNameMatchResponseDto;
+
+  @ApiProperty({
+    type: EthicsCaseDecisionResponseDto,
+  })
+  public readonly decision!: EthicsCaseDecisionResponseDto;
+
+  @ApiProperty({
+    type: [String],
+  })
+  public readonly alerts!: readonly string[];
+}
+
 class SourceCoverageResponseDto {
   @ApiProperty()
   public readonly sourceId!: string;
@@ -661,6 +856,9 @@ class ResearchSignalSummaryResponseDto {
   @ApiProperty()
   public readonly publicReferenceCandidates!: number;
 
+  @ApiProperty()
+  public readonly ethicsCandidates!: number;
+
   @ApiProperty({
     type: [String],
   })
@@ -697,6 +895,11 @@ class OwnerResearchCandidateResponseDto {
     type: [PublicReferenceCandidateResponseDto],
   })
   public readonly publicReferenceCandidates!: readonly PublicReferenceCandidateResponseDto[];
+
+  @ApiProperty({
+    type: [EthicsCaseCandidateResponseDto],
+  })
+  public readonly ethicsCaseCandidates!: readonly EthicsCaseCandidateResponseDto[];
 
   @ApiProperty({
     type: [SourceCoverageResponseDto],
@@ -747,6 +950,12 @@ class OwnerResearchCoverageResponseDto {
 
   @ApiProperty()
   public readonly curatedReferenceLedgerChecked!: boolean;
+
+  @ApiProperty()
+  public readonly ethicsMetadataSnapshotChecked!: boolean;
+
+  @ApiProperty()
+  public readonly ethicsCasesObserved!: number;
 
   @ApiProperty()
   public readonly noFindingsProvesAbsence!: boolean;

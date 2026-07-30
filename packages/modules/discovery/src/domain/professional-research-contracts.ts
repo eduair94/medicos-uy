@@ -1,6 +1,21 @@
 import type { WebEnrichmentCandidate } from './discovery-contracts';
 import type { ResearchPersonNameMatch, ResearchPersonNameMatchKind } from './research-person-name';
 
+export type ResearchEthicsCandidateNameMatch = Omit<
+  ResearchPersonNameMatch,
+  'kind' | 'flexibilityIndex'
+> &
+  (
+    | {
+        readonly kind: 'EXACT_NORMALIZED_NAME' | 'EXACT_TOKEN_MULTISET';
+        readonly flexibilityIndex: 0;
+      }
+    | {
+        readonly kind: 'PARTIAL_TOKEN_SUBSET';
+        readonly flexibilityIndex: 1;
+      }
+  );
+
 export interface ResearchMspProfessional {
   readonly linkageId: string;
   readonly fullName: string;
@@ -127,6 +142,39 @@ export interface CuratedPublicReference {
   };
 }
 
+export interface CuratedEthicsCaseReference {
+  readonly schemaVersion: 1;
+  readonly ethicsCaseId: string;
+  readonly sourceCaseKey: string;
+  readonly publisher: string;
+  readonly tribunal: string;
+  readonly title: string;
+  readonly canonicalUrl: string;
+  readonly collectionMode: 'AUTOMATED_PUBLIC_METADATA_SNAPSHOT';
+  readonly visibility: 'ORIGINAL' | 'ANONYMIZED' | 'MIXED' | 'UNKNOWN';
+  readonly outcome: 'UNKNOWN';
+  readonly finalityStatus: 'UNKNOWN';
+  readonly currentnessVerified: false;
+  readonly sourceDate: string | null;
+  readonly sourceDatePrecision: 'DAY' | null;
+  readonly observedRespondentNames: readonly string[];
+  readonly documents: readonly {
+    readonly label: string;
+    readonly sourceDate: string | null;
+    readonly sourceDatePrecision: 'DAY' | null;
+    readonly contentFetched: false;
+  }[];
+  readonly firstObservedAt: string;
+  readonly lastObservedAt: string;
+  readonly contentStored: false;
+  readonly source: {
+    readonly sitemapUrl: string;
+    readonly sitemapLastModified: string | null;
+    readonly robotsUrl: string;
+    readonly pageMetadataOnly: true;
+  };
+}
+
 export interface ProfessionalResearchSourceCoverage {
   readonly sourceId: string;
   readonly publisher: string;
@@ -174,6 +222,20 @@ export interface ProfessionalResearchCandidateView {
     readonly connection: 'DIRECT_NAME_CANDIDATE' | 'CORROBORATES_MATCHED_REFERENCE_CONTEXT_ONLY';
     readonly alerts: readonly string[];
   }[];
+  readonly ethicsCaseCandidates: readonly {
+    readonly ethicsCase: CuratedEthicsCaseReference;
+    readonly observedName: string;
+    readonly nameMatch: ResearchEthicsCandidateNameMatch;
+    readonly decision: {
+      readonly identityConfirmed: false;
+      readonly factConfirmed: false;
+      readonly linkageDecision: 'NOT_LINKED';
+      readonly publicationDecision: 'NOT_PUBLISHED';
+      readonly publicExportAllowed: false;
+      readonly requiresHumanReview: true;
+    };
+    readonly alerts: readonly string[];
+  }[];
   readonly sourceCoverage: readonly ProfessionalResearchSourceCoverage[];
   readonly signalSummary: {
     readonly officialRegistryRecords: number;
@@ -181,6 +243,7 @@ export interface ProfessionalResearchCandidateView {
     readonly scheduleRecords: number;
     readonly webCandidates: number;
     readonly publicReferenceCandidates: number;
+    readonly ethicsCandidates: number;
     readonly publishers: readonly string[];
     readonly institutionContexts: readonly string[];
   };
@@ -206,6 +269,8 @@ export interface ProfessionalResearchViewV1 {
     readonly scheduleArtifactsChecked: number;
     readonly webEnrichmentSnapshotChecked: boolean;
     readonly curatedReferenceLedgerChecked: boolean;
+    readonly ethicsMetadataSnapshotChecked: boolean;
+    readonly ethicsCasesObserved: number;
     readonly noFindingsProvesAbsence: false;
   };
   readonly warnings: readonly string[];
@@ -238,10 +303,12 @@ export interface BuildProfessionalResearchViewInput {
   readonly schedulesBySourceRecord: ReadonlyMap<string, ResearchScheduleRecord>;
   readonly webCandidates: readonly WebEnrichmentCandidate[];
   readonly publicReferences: readonly CuratedPublicReference[];
+  readonly ethicsCases?: readonly CuratedEthicsCaseReference[];
   readonly sourceCoverage?: readonly ProfessionalResearchSourceCoverage[];
   readonly checkedScheduleArtifacts: number;
   readonly webEnrichmentSnapshotChecked: boolean;
   readonly curatedReferenceLedgerChecked: boolean;
+  readonly ethicsMetadataSnapshotChecked?: boolean;
 }
 
 export function institutionalSourceRecordKey(sourceFile: string, recordId: string): string {
@@ -265,4 +332,22 @@ export function alertsForResearchNameMatch(
     alerts.push('NAME_ORDER_DIFFERS_AFTER_NORMALIZATION');
   }
   return alerts;
+}
+
+/**
+ * Ethics metadata can only create an unverified review candidate. Initials and
+ * one-token observed names are intentionally excluded because their ambiguity
+ * is too high even for automated candidate generation.
+ */
+export function isResearchEthicsCandidateNameMatch(
+  match: ResearchPersonNameMatch,
+): match is ResearchEthicsCandidateNameMatch {
+  if (match.observedTokenCount < 2 || match.initialObservedTokenCount > 0) {
+    return false;
+  }
+  return (
+    (match.flexibilityIndex === 0 &&
+      (match.kind === 'EXACT_NORMALIZED_NAME' || match.kind === 'EXACT_TOKEN_MULTISET')) ||
+    (match.flexibilityIndex === 1 && match.kind === 'PARTIAL_TOKEN_SUBSET')
+  );
 }

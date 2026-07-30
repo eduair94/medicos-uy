@@ -203,6 +203,56 @@ const publicReferenceCandidateSchema = z.object({
   alerts: z.array(nonEmptyString),
 });
 
+const ethicsCaseSchema = z.object({
+  schemaVersion: z.literal(1),
+  ethicsCaseId: nonEmptyString,
+  sourceCaseKey: nonEmptyString,
+  publisher: nonEmptyString,
+  tribunal: nonEmptyString,
+  title: nonEmptyString,
+  canonicalUrl: z.string().url(),
+  collectionMode: z.literal('AUTOMATED_PUBLIC_METADATA_SNAPSHOT'),
+  visibility: z.enum(['ORIGINAL', 'ANONYMIZED', 'MIXED', 'UNKNOWN']),
+  outcome: z.literal('UNKNOWN'),
+  finalityStatus: z.literal('UNKNOWN'),
+  currentnessVerified: z.literal(false),
+  sourceDate: nullableNonEmptyString,
+  sourceDatePrecision: z.literal('DAY').nullable(),
+  observedRespondentNames: z.array(nonEmptyString),
+  documents: z.array(
+    z.object({
+      label: nonEmptyString,
+      sourceDate: nullableNonEmptyString,
+      sourceDatePrecision: z.literal('DAY').nullable(),
+      contentFetched: z.literal(false),
+    }),
+  ),
+  firstObservedAt: nonEmptyString,
+  lastObservedAt: nonEmptyString,
+  contentStored: z.literal(false),
+  source: z.object({
+    sitemapUrl: z.string().url(),
+    sitemapLastModified: nullableNonEmptyString,
+    robotsUrl: z.string().url(),
+    pageMetadataOnly: z.literal(true),
+  }),
+});
+
+const ethicsCaseCandidateSchema = z.object({
+  ethicsCase: ethicsCaseSchema,
+  observedName: nonEmptyString,
+  nameMatch: researchNameMatchSchema,
+  decision: z.object({
+    identityConfirmed: z.literal(false),
+    factConfirmed: z.literal(false),
+    linkageDecision: z.literal('NOT_LINKED'),
+    publicationDecision: z.literal('NOT_PUBLISHED'),
+    publicExportAllowed: z.literal(false),
+    requiresHumanReview: z.literal(true),
+  }),
+  alerts: z.array(nonEmptyString),
+});
+
 const sourceCoverageSchema = z.object({
   sourceId: nonEmptyString,
   publisher: nonEmptyString,
@@ -228,6 +278,7 @@ const researchCandidateSchema = z.object({
   institutionalCandidates: z.array(institutionalCandidateSchema),
   webCandidates: z.array(webCandidateSchema),
   publicReferenceCandidates: z.array(publicReferenceCandidateSchema),
+  ethicsCaseCandidates: z.array(ethicsCaseCandidateSchema).default([]),
   sourceCoverage: z.array(sourceCoverageSchema).default([]),
   signalSummary: z.object({
     officialRegistryRecords: z.number().int().nonnegative(),
@@ -235,6 +286,7 @@ const researchCandidateSchema = z.object({
     scheduleRecords: z.number().int().nonnegative(),
     webCandidates: z.number().int().nonnegative(),
     publicReferenceCandidates: z.number().int().nonnegative(),
+    ethicsCandidates: z.number().int().nonnegative().default(0),
     publishers: z.array(nonEmptyString),
     institutionContexts: z.array(nonEmptyString),
   }),
@@ -258,6 +310,8 @@ const ownerResearchDossierSchema = z.object({
     scheduleArtifactsChecked: z.number().int().nonnegative(),
     webEnrichmentSnapshotChecked: z.boolean(),
     curatedReferenceLedgerChecked: z.boolean(),
+    ethicsMetadataSnapshotChecked: z.boolean().default(false),
+    ethicsCasesObserved: z.number().int().nonnegative().default(0),
     noFindingsProvesAbsence: z.boolean(),
   }),
   warnings: z.array(nonEmptyString),

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sanitizeOwnerResearchDossier } from '../../src/application/models/owner-research-read-model';
@@ -10,21 +10,27 @@ import { sanitizeOwnerResearchDossier } from '../../src/application/models/owner
 const describeWithDocker =
   process.env['RUN_INTEGRATION_TESTS'] === 'true' ? describe : describe.skip;
 
-function tamaraLikeResearchView(): Record<string, unknown> {
-  const nameMatch = {
+const ETHICS_CASE_ID = `ethics_case_v1_${'a'.repeat(64)}`;
+
+function exactNameMatch(): Record<string, unknown> {
+  return {
     kind: 'EXACT_NORMALIZED_NAME',
     flexibilityIndex: 0,
-    canonicalTokenCount: 4,
-    observedTokenCount: 4,
-    exactObservedTokenCount: 4,
+    canonicalTokenCount: 2,
+    observedTokenCount: 2,
+    exactObservedTokenCount: 2,
     initialObservedTokenCount: 0,
     meaning: 'LOOSENESS_NOT_IDENTITY_CONFIDENCE',
   };
+}
+
+function syntheticResearchView(): Record<string, unknown> {
+  const nameMatch = exactNameMatch();
 
   return {
     schemaVersion: 1,
-    reportId: 'report-tamara',
-    generatedAt: '2026-07-28T15:37:57.448Z',
+    reportId: `professional_research_v1_${'b'.repeat(64)}`,
+    generatedAt: '2026-07-29T12:00:00.000Z',
     purpose: 'INTERNAL_PROFESSIONAL_RESEARCH',
     query: {
       input: 'private-query-canary',
@@ -38,7 +44,7 @@ function tamaraLikeResearchView(): Record<string, unknown> {
       {
         professional: {
           linkageId: 'private-linkage-canary',
-          fullName: 'TAMARA - DIAZ SANZ FERNANDEZ',
+          fullName: 'ANA PRUEBA',
           enabledTitles: [
             {
               title: 'DOCTOR EN MEDICINA',
@@ -53,194 +59,107 @@ function tamaraLikeResearchView(): Record<string, unknown> {
           },
         },
         queryMatch: nameMatch,
-        institutionalCandidates: [
+        institutionalCandidates: [],
+        webCandidates: [],
+        publicReferenceCandidates: [],
+        ethicsCaseCandidates: [
           {
-            candidateId: 'provider-asociacion-espanola',
-            institution: 'Asociación Española',
-            status: 'exact_name_only',
-            providerIdentity: {
-              institution: 'Asociación Española',
-              basis: 'institution_and_exact_name',
-              sourceProfessionalId: '30358',
-              normalizedName: 'tamara diaz sanz fernandez',
-            },
-            sourceDisplayNames: ['Tamara Díaz Sanz Fernández'],
-            sourceSpecialties: ['SIQUIATRIA'],
-            identityEvidence: ['Exact normalized name'],
-            schedules: [
-              {
-                schemaVersion: 1,
-                recordId: 'schedule-1',
-                source: {
-                  id: 'asociacion-espanola',
-                  institution: 'Asociación Española',
-                  url: 'https://www.asesp.com.uy/Agenda-Medica/Agenda-Medica-uc30',
-                },
-                observedAt: '2026-07-28T15:06:32.048Z',
-                scheduleType: 'published_consultation_roster',
-                appointmentAvailability: 'not_observed',
-                sourceProfessionalId: '30358',
-                sourceProfessionalLabel: 'Tamara Díaz Sanz Fernández',
-                professionalName: 'Tamara Díaz Sanz Fernández',
-                specialty: 'SIQUIATRIA',
-                venue: {
-                  name: 'Sede Central',
-                  address: 'Av. Italia',
-                  phone: '0000',
-                  dependency: 'Consultorio',
-                },
-                weeklySchedule: [
-                  {
-                    dayOfWeek: 'TUESDAY',
-                    sourceLabel: 'Martes',
-                    value: '09:00-12:00',
-                  },
-                ],
-                frequency: 'WEEKLY',
-                notes: 'Published roster',
-                evidence: {
-                  rawSnapshotPath: 'private-path-canary',
-                },
-              },
-            ],
-            unresolvedSourceRecords: [
-              {
-                recordId: 'unresolved-1',
-                sourceFile: 'private-file-canary',
-              },
-            ],
-            identityConfirmed: false,
-            linkageDecision: 'NOT_LINKED',
-            publicationDecision: 'NOT_PUBLISHED',
-            requiresHumanReview: true,
-            alerts: ['Candidate association only'],
-          },
-        ],
-        webCandidates: [
-          {
-            schemaVersion: 1,
-            candidateId: 'web-1',
-            state: 'NEEDS_HUMAN_REVIEW',
-            quarantine: true,
-            subject: {
-              displayName: 'Tamara Díaz Sanz',
-            },
-            claim: {
-              category: 'ACADEMIC_MENTION',
-              sourceId: 'claeh',
-              publisher: 'Universidad CLAEH',
-            },
-            match: {
-              kind: 'PARTIAL_TOKEN_SUBSET',
-              flexibilityIndex: 1,
-              meaning: 'LOOSENESS_NOT_IDENTITY_CONFIDENCE',
-              ambiguity: 'HOMONYM',
-              alerts: ['Human review required'],
-              competingOpaqueProfessionalIds: ['private-competitor-canary'],
-            },
-            provenance: {
-              canonicalUrl:
-                'https://universidad.claeh.edu.uy/medicina/2018/07/10/jornada-de-actualizacion-para-el-equipo-de-salud/',
-              retrievedAt: '2026-07-28T15:37:57.448Z',
-              transport: 'DIRECT_FETCH',
-              contentSha256: 'private-content-hash-canary',
-              professionalSnapshotSha256: 'private-snapshot-hash-canary',
-              sourcePolicySha256: 'private-policy-hash-canary',
-            },
-            linkageDecision: {
-              decision: 'NOT_LINKED',
-              identityConfirmed: false,
-            },
-            factDecision: {
-              factConfirmed: false,
-            },
-            publicationDecision: {
-              decision: 'NOT_PUBLISHED',
-              destination: 'INTERNAL_QUARANTINE_ONLY',
-              publicExportAllowed: false,
-            },
-            retention: {
-              expiresAt: '2026-10-28T15:37:57.448Z',
-              disposition: 'DELETE_OR_REVALIDATE',
-            },
-          },
-        ],
-        publicReferenceCandidates: [
-          {
-            reference: {
+            ethicsCase: {
               schemaVersion: 1,
-              referenceId: 'reference-1',
-              referenceKind: 'CRAWLED_SOURCE_METADATA',
-              publisher: 'Universidad CLAEH',
+              ethicsCaseId: ETHICS_CASE_ID,
+              sourceCaseKey: '101/2026',
+              publisher: 'Colegio Médico del Uruguay',
+              tribunal: 'Tribunal de Ética Médica',
+              title: 'Expediente sintético 101/2026',
               canonicalUrl:
-                'https://universidad.claeh.edu.uy/medicina/2018/07/10/jornada-de-actualizacion-para-el-equipo-de-salud/',
-              title: 'Jornada de actualización',
-              sourceDate: '2018-07-10',
+                'https://www.colegiomedico.org.uy/fallos/expediente-sintetico-101-2026/',
+              collectionMode: 'AUTOMATED_PUBLIC_METADATA_SNAPSHOT',
+              visibility: 'ORIGINAL',
+              outcome: 'UNKNOWN',
+              finalityStatus: 'UNKNOWN',
+              currentnessVerified: false,
+              sourceDate: '2026-06-01',
               sourceDatePrecision: 'DAY',
-              observedNames: ['Tamara Díaz Sanz'],
-              claim: {
-                relationship: 'MEDICAL_STUDENT_PRESENTATION',
-                factualSummary: 'Public metadata mentions the observed name.',
-                institutionContext: ['Universidad CLAEH'],
-                doesNotEstablish: ['Identity'],
+              observedRespondentNames: ['ANA PRUEBA'],
+              documents: [
+                {
+                  label: 'Documento sintético',
+                  sourceDate: '2026-06-01',
+                  sourceDatePrecision: 'DAY',
+                  contentFetched: false,
+                  downloadUrl: 'private-document-url-canary',
+                },
+              ],
+              firstObservedAt: '2026-07-29T12:00:00.000Z',
+              lastObservedAt: '2026-07-29T12:00:00.000Z',
+              contentStored: false,
+              source: {
+                sitemapUrl: 'https://www.colegiomedico.org.uy/fallos-sitemap.xml',
+                sitemapLastModified: '2026-07-29',
+                robotsUrl: 'https://www.colegiomedico.org.uy/robots.txt',
+                pageMetadataOnly: true,
+                robotsSha256: 'private-robots-hash-canary',
               },
-              access: {
-                mode: 'ALLOWLISTED_PUBLIC_PAGE',
-                automatedFetchAllowed: true,
-                contentStored: false,
-                rightsNote: 'Metadata only',
-              },
-              corroboratesReferenceIds: [],
-              decision: {
-                identityConfirmed: false,
-                factConfirmed: false,
-                linkageDecision: 'NOT_LINKED',
-                publicationDecision: 'NOT_PUBLISHED',
-                publicExportAllowed: false,
-                requiresHumanReview: true,
+              sourceMetadata: {
+                private: 'must-not-cross-sql-boundary',
               },
             },
+            observedName: 'ANA PRUEBA',
             nameMatch,
-            connection: 'DIRECT_NAME_CANDIDATE',
-            alerts: ['Unconfirmed association'],
+            decision: {
+              identityConfirmed: false,
+              factConfirmed: false,
+              linkageDecision: 'NOT_LINKED',
+              publicationDecision: 'NOT_PUBLISHED',
+              publicExportAllowed: false,
+              requiresHumanReview: true,
+              privateReviewer: 'must-not-cross-sql-boundary',
+            },
+            alerts: ['Coincidencia exacta pendiente de revisión humana.'],
+            candidateSha256: 'private-candidate-hash-canary',
           },
         ],
         sourceCoverage: [
           {
             sourceId: 'colegio-medico-etica',
             publisher: 'Colegio Médico del Uruguay',
-            sourceUrl: 'https://www.colegiomedico.org.uy/fallos-emitidos-por-el-tribunal-de-etica/',
+            sourceUrl: 'https://www.colegiomedico.org.uy/fallos-sitemap.xml',
             category: 'PROFESSIONAL_ETHICS_RULINGS',
             status: 'CHECKED',
-            policyReviewedAt: '2026-07-28T15:37:57.448Z',
+            policyReviewedAt: '2026-07-29T12:00:00.000Z',
             automatedFetchPerformed: true,
-            namedMatchStatus: 'NO_NAMED_MATCH_IN_CURRENT_VISIBLE_INDEX',
-            noFindingProvesAbsence: true,
+            namedMatchStatus: 'CANDIDATE_REQUIRES_HUMAN_REVIEW',
+            noFindingProvesAbsence: false,
             identityDecision: 'NOT_LINKED',
             publicationDecision: 'NOT_PUBLISHED',
-            warnings: ['Absence of a match is not proof of absence.'],
+            warnings: ['Una coincidencia nominal no confirma identidad ni hechos.'],
           },
         ],
         signalSummary: {
           officialRegistryRecords: 1,
-          institutionalCandidates: 1,
-          scheduleRecords: 1,
-          webCandidates: 1,
-          publicReferenceCandidates: 1,
-          publishers: ['Ministerio de Salud Pública', 'Universidad CLAEH'],
-          institutionContexts: ['Asociación Española', 'Universidad CLAEH'],
+          institutionalCandidates: 0,
+          scheduleRecords: 0,
+          webCandidates: 0,
+          publicReferenceCandidates: 0,
+          ethicsCandidates: 1,
+          publishers: ['Ministerio de Salud Pública', 'Colegio Médico del Uruguay'],
+          institutionContexts: [],
+          privateCount: 999,
         },
       },
     ],
     coverage: {
       mspSnapshotChecked: true,
       linkageSnapshotChecked: true,
-      scheduleArtifactsChecked: 1,
+      scheduleArtifactsChecked: 0,
       webEnrichmentSnapshotChecked: true,
       curatedReferenceLedgerChecked: true,
+      ethicsMetadataSnapshotChecked: true,
+      ethicsCasesObserved: 1,
       noFindingsProvesAbsence: false,
+      privateCoverage: 'must-not-cross-sql-boundary',
     },
-    warnings: ['Associations require human review.'],
+    warnings: ['Las asociaciones son candidatas no confirmadas.'],
     delivery: {
       intendedSurface: 'AUTHENTICATED_PRIVATE_API',
       intendedAudience: 'OWNER_ONLY',
@@ -277,7 +196,140 @@ function injectCanaryAtEveryObject(value: unknown): unknown {
   return value;
 }
 
-describeWithDocker('owner research SQL sanitizer', () => {
+async function installMigrationPrerequisites(pool: Pool): Promise<void> {
+  await pool.query(`
+    CREATE ROLE medicos_migrator NOLOGIN;
+    CREATE ROLE medicos_catalog_reader NOLOGIN;
+    CREATE ROLE medicos_public_query NOLOGIN;
+    CREATE ROLE medicos_private_ingestor NOLOGIN;
+    CREATE ROLE medicos_owner_research_reader NOLOGIN;
+
+    CREATE SCHEMA ingestion_private;
+    CREATE TABLE ingestion_private.snapshot (
+      snapshot_id varchar(120) PRIMARY KEY
+    );
+    CREATE TABLE ingestion_private.professional_profile (
+      snapshot_id varchar(120) NOT NULL,
+      internal_hmac_id varchar(75) NOT NULL,
+      PRIMARY KEY (snapshot_id, internal_hmac_id),
+      FOREIGN KEY (snapshot_id)
+        REFERENCES ingestion_private.snapshot(snapshot_id)
+    );
+    CREATE TABLE ingestion_private.msp_catalog_identity (
+      professional_public_id uuid NOT NULL,
+      internal_hmac_id varchar(75) NOT NULL
+    );
+
+    CREATE SCHEMA catalog;
+    CREATE TABLE catalog.public_professional (
+      id uuid PRIMARY KEY
+    );
+    CREATE TABLE catalog.public_professional_route (
+      professional_id uuid NOT NULL,
+      slug text NOT NULL,
+      route_kind text NOT NULL
+    );
+  `);
+}
+
+async function applyResearchMigrations(pool: Pool): Promise<void> {
+  for (const file of [
+    '0006_professional_research.sql',
+    '0007_owner_research_read_model.sql',
+    '0008_cmu_ethics_metadata_snapshot.sql',
+  ]) {
+    const migrationSql = await readFile(
+      resolve(process.cwd(), 'drizzle/research-private/migrations', file),
+      'utf8',
+    );
+    await pool.query(migrationSql);
+  }
+}
+
+async function withRole<T>(
+  pool: Pool,
+  role: 'medicos_owner_research_reader' | 'medicos_public_query',
+  operation: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+
+  try {
+    await client.query(`SET ROLE ${role}`);
+    return await operation(client);
+  } finally {
+    await client.query('RESET ROLE');
+    client.release();
+  }
+}
+
+function automatedEthicsCaseInsert(
+  idCharacter: string,
+  sourceCaseKey: string,
+): {
+  readonly text: string;
+  readonly values: unknown[];
+} {
+  return {
+    text: `
+      INSERT INTO research_private.ethics_case (
+        ethics_case_id,
+        publisher,
+        source_case_key,
+        tribunal,
+        title,
+        canonical_url,
+        collection_mode,
+        visibility,
+        outcome,
+        finality_status,
+        currentness_verified,
+        source_date,
+        source_date_precision,
+        document_sha256,
+        source_metadata,
+        content_stored,
+        first_observed_at,
+        last_observed_at
+      )
+      VALUES (
+        $1,
+        'Colegio Médico del Uruguay',
+        $2,
+        'Tribunal de Ética Médica',
+        'Expediente sintético',
+        'https://www.colegiomedico.org.uy/fallos/expediente-sintetico/',
+        'AUTOMATED_PUBLIC_METADATA_SNAPSHOT',
+        'ORIGINAL',
+        'UNKNOWN',
+        'UNKNOWN',
+        false,
+        '2026-06-01',
+        'DAY',
+        NULL,
+        $3::jsonb,
+        false,
+        '2026-07-29T12:00:00.000Z',
+        '2026-07-29T12:00:00.000Z'
+      )
+    `,
+    values: [
+      `ethics_case_v1_${idCharacter.repeat(64)}`,
+      sourceCaseKey,
+      JSON.stringify({
+        safeguards: {
+          pageMetadataOnly: true,
+          pdfFetched: false,
+          documentContentFetched: false,
+          automaticIdentityConfirmation: false,
+          automaticFactConfirmation: false,
+          publicExportAllowed: false,
+        },
+      }),
+    ],
+  };
+}
+
+describeWithDocker('owner research SQL migrations and sanitizer', () => {
   let container: StartedPostgreSqlContainer;
   let pool: Pool;
 
@@ -291,24 +343,8 @@ describeWithDocker('owner research SQL sanitizer', () => {
       connectionString: container.getConnectionUri(),
     });
 
-    const migrationSql = await readFile(
-      resolve(
-        process.cwd(),
-        'drizzle/research-private/migrations/0007_owner_research_read_model.sql',
-      ),
-      'utf8',
-    );
-    const functionDefinitions =
-      /CREATE OR REPLACE FUNCTION research_private\.owner_jsonb_pick[\s\S]*?(?=(?:DROP VIEW IF EXISTS|CREATE(?: OR REPLACE)? VIEW) research_private\.owner_professional_dossier)/u.exec(
-        migrationSql,
-      )?.[0];
-
-    if (functionDefinitions === undefined) {
-      throw new Error('Could not locate owner research sanitizer function definitions.');
-    }
-
-    await pool.query('CREATE SCHEMA research_private');
-    await pool.query(functionDefinitions);
+    await installMigrationPrerequisites(pool);
+    await applyResearchMigrations(pool);
   }, 60_000);
 
   afterAll(async () => {
@@ -316,8 +352,76 @@ describeWithDocker('owner research SQL sanitizer', () => {
     await container?.stop();
   });
 
-  it('matches the strict API DTO and removes unknown keys at every object depth', async () => {
-    const input = injectCanaryAtEveryObject(tamaraLikeResearchView());
+  it('applies 0008 and keeps the read model owner-only', async () => {
+    const privileges = await pool.query<{
+      readonly owner_schema_usage: boolean;
+      readonly owner_view_select: boolean;
+      readonly owner_function_execute: boolean;
+      readonly owner_ethics_table_select: boolean;
+      readonly public_view_select: boolean;
+      readonly public_function_execute: boolean;
+    }>(`
+      SELECT
+        has_schema_privilege(
+          'medicos_owner_research_reader',
+          'research_private',
+          'USAGE'
+        ) AS owner_schema_usage,
+        has_table_privilege(
+          'medicos_owner_research_reader',
+          'research_private.owner_professional_dossier',
+          'SELECT'
+        ) AS owner_view_select,
+        has_function_privilege(
+          'medicos_owner_research_reader',
+          'research_private.sanitize_owner_research_view(jsonb)',
+          'EXECUTE'
+        ) AS owner_function_execute,
+        has_table_privilege(
+          'medicos_owner_research_reader',
+          'research_private.ethics_case',
+          'SELECT'
+        ) AS owner_ethics_table_select,
+        has_table_privilege(
+          'medicos_public_query',
+          'research_private.owner_professional_dossier',
+          'SELECT'
+        ) AS public_view_select,
+        has_function_privilege(
+          'medicos_public_query',
+          'research_private.sanitize_owner_research_view(jsonb)',
+          'EXECUTE'
+        ) AS public_function_execute
+    `);
+
+    expect(privileges.rows[0]).toEqual({
+      owner_schema_usage: true,
+      owner_view_select: true,
+      owner_function_execute: true,
+      owner_ethics_table_select: false,
+      public_view_select: false,
+      public_function_execute: false,
+    });
+
+    await expect(
+      withRole(pool, 'medicos_owner_research_reader', async (client) =>
+        client.query('SELECT count(*) FROM research_private.owner_professional_dossier'),
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      withRole(pool, 'medicos_owner_research_reader', async (client) =>
+        client.query('SELECT count(*) FROM research_private.ethics_case'),
+      ),
+    ).rejects.toThrow(/permission denied/u);
+    await expect(
+      withRole(pool, 'medicos_public_query', async (client) =>
+        client.query('SELECT count(*) FROM research_private.owner_professional_dossier'),
+      ),
+    ).rejects.toThrow(/permission denied/u);
+  });
+
+  it('matches the strict API DTO while removing private and unknown fields', async () => {
+    const input = injectCanaryAtEveryObject(syntheticResearchView());
     const expected = sanitizeOwnerResearchDossier(input);
     const result = await pool.query<{ readonly sanitized: unknown }>(
       `
@@ -327,11 +431,36 @@ describeWithDocker('owner research SQL sanitizer', () => {
       [JSON.stringify(input)],
     );
     const sanitized = result.rows[0]?.sanitized;
+    const serialized = JSON.stringify(sanitized);
 
     expect(sanitized).toEqual(expected);
-    expect(JSON.stringify(sanitized)).not.toContain('__unknown_canary__');
-    expect(JSON.stringify(sanitized)).not.toContain('private-query-canary');
-    expect(JSON.stringify(sanitized)).not.toContain('private-linkage-canary');
-    expect(JSON.stringify(sanitized)).not.toContain('private-content-hash-canary');
+    expect(serialized).not.toContain('__unknown_canary__');
+    expect(serialized).not.toContain('private-query-canary');
+    expect(serialized).not.toContain('private-linkage-canary');
+    expect(serialized).not.toContain('private-document-url-canary');
+    expect(serialized).not.toContain('private-candidate-hash-canary');
+    expect(serialized).not.toContain('sourceMetadata');
+    expect(serialized).toContain('ethicsCaseCandidates');
+    expect(serialized).toContain('ethicsMetadataSnapshotChecked');
+  });
+
+  it('accepts safe metadata-only cases and rejects missing safeguards', async () => {
+    const validInsert = automatedEthicsCaseInsert('c', 'fixture-valid-101/2026');
+    await expect(pool.query(validInsert.text, validInsert.values)).resolves.toBeDefined();
+
+    const unsafeInsert = automatedEthicsCaseInsert('d', 'fixture-unsafe-102/2026');
+    const incompleteMetadata = JSON.stringify({
+      safeguards: {
+        pageMetadataOnly: true,
+      },
+    });
+
+    await expect(
+      pool.query(unsafeInsert.text, [
+        unsafeInsert.values[0],
+        unsafeInsert.values[1],
+        incompleteMetadata,
+      ]),
+    ).rejects.toThrow(/ck_research_ethics_case_automated_metadata/u);
   });
 });

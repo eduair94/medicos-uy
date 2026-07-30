@@ -67,6 +67,7 @@
     "data:ingest:medica-uruguaya": "tsx scripts/ingestion/mutualistas/ingest-medica-uruguaya.ts",
     "data:ingest:hospital-britanico": "tsx scripts/ingestion/mutualistas/ingest-hospital-britanico.ts",
     "data:ingest:news-indexes": "tsx scripts/ingestion/news/ingest-uruguayan-news-indexes.ts",
+    "data:ingest:cmu-ethics": "tsx scripts/ingestion/ethics/collect-cmu-ethics-metadata.ts",
     "data:purge:news": "tsx scripts/ingestion/news/purge-expired-news-artifacts.ts",
     "data:purge:news:apply": "tsx scripts/ingestion/news/purge-expired-news-artifacts.ts --apply",
     "data:link:candidates": "tsx scripts/ingestion/linkage/build-linkage-candidates.ts",

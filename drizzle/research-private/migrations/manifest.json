@@ -12,6 +12,12 @@
       "file": "0007_owner_research_read_model.sql",
       "sha256": "d32fd928fdfd60cfda4f910cb6eeee4829906dc8bcdbe66b7a3d1ba6913d847c",
       "execution": "MANAGED"
+    },
+    {
+      "id": "0008_cmu_ethics_metadata_snapshot",
+      "file": "0008_cmu_ethics_metadata_snapshot.sql",
+      "sha256": "197cd2fac0a36a78984a0d6c4892a191ba6b8e4a0cbbc28eb6194587b05d713c",
+      "execution": "MANAGED"
     }
   ]
 }

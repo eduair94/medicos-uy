@@ -32,16 +32,22 @@ lock_file="${MEDICOS_ANALYSIS_LOCK_FILE:-/var/lib/medicos-backend/private-analys
 status_file="${MEDICOS_ANALYSIS_STATUS_FILE:-/var/lib/medicos-backend/logs/private-analysis/latest.json}"
 analysis_entrypoint="${application_directory}/scripts/ingestion/research/build-and-persist-all-professionals.ts"
 projection_entrypoint="${application_directory}/scripts/ingestion/publication/sync-msp-catalog.ts"
+cmu_collector_entrypoint="${application_directory}/scripts/ingestion/ethics/collect-cmu-ethics-metadata.ts"
 
 if [ "${CMU_ETHICS_FETCH_ENABLED:-false}" != "false" ]; then
-  echo "CMU_ETHICS_FETCH_ENABLED must remain false: automated Colegio Medico ethics crawling is prohibited" >&2
+  echo "CMU_ETHICS_FETCH_ENABLED is a retired unsafe switch and must remain false" >&2
   exit 1
 fi
 export CMU_ETHICS_FETCH_ENABLED=false
+if [ "${CMU_ETHICS_METADATA_COLLECTION_APPROVAL:-}" != "COLLECT_ALLOWED_PUBLIC_METADATA" ]; then
+  echo "CMU_ETHICS_METADATA_COLLECTION_APPROVAL is missing or invalid" >&2
+  exit 1
+fi
 
 if [ ! -f "${application_directory}/package.json" ] ||
   [ ! -f "${analysis_entrypoint}" ] ||
-  [ ! -f "${projection_entrypoint}" ]; then
+  [ ! -f "${projection_entrypoint}" ] ||
+  [ ! -f "${cmu_collector_entrypoint}" ]; then
   echo "Medicos application or private analysis entrypoint is unavailable: ${application_directory}" >&2
   exit 1
 fi
@@ -100,6 +106,67 @@ if [ "${MSP_CATALOG_PROJECTION_REVIEW_REFERENCE:-}" != "https://www.gub.uy/minis
   echo "MSP_CATALOG_PROJECTION_REVIEW_REFERENCE must be the official MSP Infotitulos URL" >&2
   exit 1
 fi
+
+data_directory="${DATA_INGESTION_DIR:-/srv/medicos-backend/data}"
+cmu_snapshot_root="${CMU_ETHICS_SNAPSHOT_ROOT:-${data_directory}/normalized/ethics/cmu}"
+case "${data_directory}" in
+  /*) ;;
+  *)
+    echo "DATA_INGESTION_DIR must be an absolute path" >&2
+    exit 1
+    ;;
+esac
+case "${cmu_snapshot_root}" in
+  /*) ;;
+  *)
+    echo "CMU_ETHICS_SNAPSHOT_ROOT must be an absolute path" >&2
+    exit 1
+    ;;
+esac
+if [ -L "${data_directory}" ] || [ ! -d "${data_directory}" ]; then
+  echo "DATA_INGESTION_DIR must be a provisioned directory, not a symlink" >&2
+  exit 1
+fi
+if [ -L "${cmu_snapshot_root}" ] || [ ! -d "${cmu_snapshot_root}" ]; then
+  echo "CMU_ETHICS_SNAPSHOT_ROOT must be a provisioned directory, not a symlink" >&2
+  exit 1
+fi
+canonical_data_directory="$(CDPATH= cd "${data_directory}" && pwd -P)"
+canonical_cmu_snapshot_root="$(CDPATH= cd "${cmu_snapshot_root}" && pwd -P)"
+data_directory_mode="$(stat -c '%a' "${canonical_data_directory}")"
+data_directory_owner="$(stat -c '%u' "${canonical_data_directory}")"
+if [ "${data_directory_owner}" -ne 0 ] || [ $((0${data_directory_mode} & 0077)) -ne 0 ]; then
+  echo "DATA_INGESTION_DIR must be root-owned and inaccessible to group/others" >&2
+  exit 1
+fi
+if [ "${canonical_cmu_snapshot_root}" = "${canonical_data_directory}" ]; then
+  echo "CMU_ETHICS_SNAPSHOT_ROOT must be a dedicated directory below DATA_INGESTION_DIR" >&2
+  exit 1
+fi
+case "${canonical_cmu_snapshot_root}/" in
+  "${canonical_data_directory}/"*) ;;
+  *)
+    echo "CMU_ETHICS_SNAPSHOT_ROOT must resolve below DATA_INGESTION_DIR" >&2
+    exit 1
+    ;;
+esac
+cmu_snapshot_root_mode="$(stat -c '%a' "${canonical_cmu_snapshot_root}")"
+cmu_snapshot_root_owner="$(stat -c '%u' "${canonical_cmu_snapshot_root}")"
+if [ "${cmu_snapshot_root_owner}" -ne 0 ] ||
+  [ $((0${cmu_snapshot_root_mode} & 0077)) -ne 0 ]; then
+  echo "CMU_ETHICS_SNAPSHOT_ROOT must be root-owned and inaccessible to group/others" >&2
+  exit 1
+fi
+cmu_path_component="${canonical_cmu_snapshot_root}"
+while [ "${cmu_path_component}" != "${canonical_data_directory}" ]; do
+  cmu_path_mode="$(stat -c '%a' "${cmu_path_component}")"
+  cmu_path_owner="$(stat -c '%u' "${cmu_path_component}")"
+  if [ "${cmu_path_owner}" -ne 0 ] || [ $((0${cmu_path_mode} & 0022)) -ne 0 ]; then
+    echo "Every CMU snapshot path component must be root-owned and not group/world writable" >&2
+    exit 1
+  fi
+  cmu_path_component="$(dirname "${cmu_path_component}")"
+done
 
 status_directory="$(dirname "${status_file}")"
 mkdir -p "${status_directory}"
@@ -161,25 +228,59 @@ else
   write_status "RUNNING" "null" "${run_started_at}" "null"
   echo '{"event":"private_analysis_started"}'
 
-  "${tsx_executable}" "${analysis_entrypoint}" &
+  cmu_snapshot_run_id="$(date -u '+%Y%m%dT%H%M%SZ')-$$"
+  CMU_ETHICS_OUTPUT_DIR="${canonical_cmu_snapshot_root}/snapshot-${cmu_snapshot_run_id}"
+  export CMU_ETHICS_OUTPUT_DIR
+  echo '{"event":"cmu_ethics_metadata_collection_started"}'
+
+  "${tsx_executable}" "${cmu_collector_entrypoint}" &
   analysis_pid="$!"
 
   if wait "${analysis_pid}"; then
     analysis_pid=''
-    echo '{"event":"msp_catalog_projection_started"}'
-    "${tsx_executable}" "${projection_entrypoint}" &
-    analysis_pid="$!"
+    cmu_manifest="${CMU_ETHICS_OUTPUT_DIR}/manifest.json"
+    cmu_cases="${CMU_ETHICS_OUTPUT_DIR}/cases.ndjson"
+    if [ -d "${CMU_ETHICS_OUTPUT_DIR}" ] &&
+      [ ! -L "${CMU_ETHICS_OUTPUT_DIR}" ] &&
+      [ -f "${cmu_manifest}" ] &&
+      [ ! -L "${cmu_manifest}" ] &&
+      [ -f "${cmu_cases}" ] &&
+      [ ! -L "${cmu_cases}" ]; then
+      PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH="${CMU_ETHICS_OUTPUT_DIR}"
+      export PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH
+      echo '{"event":"cmu_ethics_metadata_collection_verified"}'
+      echo '{"event":"professional_analysis_stage_started"}'
 
-    if wait "${analysis_pid}"; then
-      analysis_exit_code=0
-      analysis_state="COMPLETED"
+      "${tsx_executable}" "${analysis_entrypoint}" &
+      analysis_pid="$!"
+
+      if wait "${analysis_pid}"; then
+        analysis_pid=''
+        echo '{"event":"msp_catalog_projection_started"}'
+        "${tsx_executable}" "${projection_entrypoint}" &
+        analysis_pid="$!"
+
+        if wait "${analysis_pid}"; then
+          analysis_exit_code=0
+          analysis_state="COMPLETED"
+        else
+          analysis_exit_code="$?"
+          analysis_state="FAILED"
+        fi
+      else
+        analysis_exit_code="$?"
+        analysis_state="FAILED"
+      fi
     else
-      analysis_exit_code="$?"
+      analysis_exit_code=1
       analysis_state="FAILED"
+      echo '{"event":"cmu_ethics_metadata_snapshot_invalid"}' >&2
     fi
   else
     analysis_exit_code="$?"
     analysis_state="FAILED"
+    printf '{"event":"cmu_ethics_metadata_collection_failed","exitCode":%s}\n' \
+      "${analysis_exit_code}" >&2
   fi
   analysis_pid=''
   "${flock_executable}" -u 9

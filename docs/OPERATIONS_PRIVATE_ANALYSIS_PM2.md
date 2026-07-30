@@ -14,12 +14,14 @@ Con el hostname definitivo configurado en `PUBLIC_API_BASE_URL`, la documentaci�
 en `/docs`, el contrato en `/openapi.json`, el catálogo en `/.well-known/api-catalog` y RSD en
 `/rsd.xml`.
 
-Este proceso ejecuta dos etapas fail-fast. Primero construye y persiste el análisis interno de
-todos los profesionales del snapshot MSP seleccionado. Si esa etapa termina correctamente,
-proyecta al catálogo factual **únicamente** nombre y títulos oficiales de Infotítulos, con
-evidencia, claims, vigencia y rutas estables. El endpoint owner `research` lee aparte el dossier
-privado autenticado y conserva candidatos, agendas, referencias y decisiones sin convertirlas en
-hechos confirmados.
+Este proceso ejecuta tres etapas fail-fast. Primero recolecta un snapshot inmutable de metadatos
+públicos del Tribunal de Ética desde el sitemap específico y las páginas de caso permitidas por la
+política `robots.txt` revisada. Luego construye y persiste el análisis interno de todos los
+profesionales del snapshot MSP seleccionado. Sólo si ambas etapas terminan correctamente proyecta
+al catálogo factual **únicamente** nombre y títulos oficiales de Infotítulos, con evidencia,
+claims, vigencia y rutas estables. El endpoint owner `research` lee aparte el dossier privado
+autenticado y conserva candidatos, agendas, referencias y decisiones sin convertirlas en hechos
+confirmados.
 
 PM2 mantiene un único scheduler vivo. El proceso ejecuta el batch una vez al iniciar o reiniciar y
 luego queda inactivo. `cron_restart` lo reinicia diariamente a las **06:37 UTC**, equivalentes a
@@ -44,14 +46,24 @@ servidor 104.
 - evidencia inmutable por snapshot, vencimiento a 62 días del corte y supresión de ausentes;
 - una reaparición sólo revierte una supresión automática si nadie moderó la fila mientras estuvo
   ausente; `DISABLED` y `UNDER_REVIEW` nunca son reactivados por el scheduler;
-- `CMU_ETHICS_FETCH_ENABLED=false` es obligatorio y el wrapper aborta si alguien intenta activarlo.
+- aprobación explícita `CMU_ETHICS_METADATA_COLLECTION_APPROVAL=COLLECT_ALLOWED_PUBLIC_METADATA`;
+- un directorio CMU nuevo por ejecución, modo privado, sin sobrescribir el último snapshot válido;
+- `PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH` se exporta sólo después de comprobar que el manifiesto
+  y el NDJSON fueron instalados como archivos regulares, no enlaces simbólicos;
+- el hash revisado de `robots.txt` está fijado en el recolector: un cambio aborta antes de leer el
+  sitemap;
+- `CMU_ETHICS_FETCH_ENABLED=false` conserva bloqueado el antiguo interruptor de descarga amplia.
 
 La
-[página oficial de fallos del Tribunal de Ética](https://www.colegiomedico.org.uy/fallos-emitidos-por-el-tribunal-de-etica/)
-puede conservarse como cobertura o referencia curada. Este job no descarga automáticamente el
-índice, las páginas de fallo ni sus PDF: el
-[`robots.txt` oficial](https://www.colegiomedico.org.uy/robots.txt) bloquea esas rutas. La ausencia
-de un vínculo curado tampoco prueba que una persona carezca de antecedentes.
+[página índice oficial de fallos](https://www.colegiomedico.org.uy/fallos-emitidos-por-el-tribunal-de-etica/)
+y `/wp-content/uploads/` están expresamente excluidos por
+[`robots.txt`](https://www.colegiomedico.org.uy/robots.txt). El recolector no accede a esas rutas,
+no descarga PDF y no persiste HTML ni enlaces de descarga. Sólo usa
+[`fallos-sitemap.xml`](https://www.colegiomedico.org.uy/fallos-sitemap.xml) y páginas
+`/fallos/<slug>/` que la política vigente permita. Guarda título, URL canónica, clave de caso,
+fechas/etiquetas visibles y nombres conservadoramente extraídos del título. No infiere resultado,
+firmeza ni sanción. Una coincidencia de nombre es siempre un candidato no confirmado y la ausencia
+de coincidencias nunca prueba que una persona carezca de antecedentes.
 
 ## Preparar código, usuario y directorios
 
@@ -62,6 +74,7 @@ scheduler si `ingestion_private.professional_profile` no contiene el universo MS
 sudo install -d -o root -g root -m 0700 \
   /var/lib/medicos-backend \
   /srv/medicos-backend/data \
+  /srv/medicos-backend/data/normalized/ethics/cmu \
   /var/lib/medicos-backend/logs \
   /var/lib/medicos-backend/logs/private-analysis
 sudo install -d -o root -g root -m 0700 /etc/medicos-backend
@@ -140,6 +153,17 @@ del certificado en `PROFESSIONAL_ANALYSIS_DATABASE_SSL_CA_PATH` y
 `node_modules/.bin/tsx`; no dependa de un `pnpm` global inexistente en el host. Nunca copie la
 contraseña a la línea de comandos, al ecosistema o al log.
 
+Configure también
+`CMU_ETHICS_METADATA_COLLECTION_APPROVAL=COLLECT_ALLOWED_PUBLIC_METADATA` y
+`CMU_ETHICS_SNAPSHOT_ROOT=/srv/medicos-backend/data/normalized/ethics/cmu`. No fije
+`CMU_ETHICS_OUTPUT_DIR` ni `PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH` en PM2: el wrapper genera una
+ruta única bajo esa raíz, instala allí el snapshot de forma atómica y exporta exactamente ese
+directorio al proceso de análisis. Las dos raíces deben existir previamente como directorios
+`root:root 0700`; el wrapper no las crea ni corrige y rechaza enlaces simbólicos. Un uso manual de
+`data:analyze:all-professionals`, fuera del wrapper, sí debe recibir
+`PROFESSIONAL_ANALYSIS_CMU_SNAPSHOT_PATH` apuntando al directorio completo que contiene
+`manifest.json` y `cases.ndjson`.
+
 Complete además `MSP_CATALOG_PROJECTION_APPROVAL=PROJECT_OFFICIAL_MSP_FIELDS`,
 `MSP_CATALOG_PROJECTION_REVIEWED_BY` con el identificador del operador o cambio aprobado y
 `MSP_CATALOG_PROJECTION_REVIEWED_AT` con la fecha UTC ISO-8601 exacta de esa aprobación, y
@@ -158,7 +182,8 @@ Use
 como acta externa de cada transferencia:
 
 1. registre el commit exacto desplegado;
-2. liste el manifiesto y payload de MSP, linkage, enriquecimiento web y referencias curadas;
+2. liste el manifiesto y payload de MSP, linkage, metadatos CMU, enriquecimiento web y referencias
+   curadas;
 3. calcule `sha256sum` en origen y nuevamente en el servidor;
 4. compare `records` con el conteo físico NDJSON y con el manifiesto de cada productor;
 5. compruebe que todos los paths resuelven debajo de `/srv/medicos-backend/data`;
@@ -169,15 +194,23 @@ ejecución, por ejemplo en `/srv/medicos-backend/data/manifests/sync/`, y conser
 válido hasta verificar la carga. El batch vuelve a validar los manifiestos productores; el acta de
 sync es evidencia operacional adicional, no sustituye esas validaciones.
 
+En la operación normal del servidor 104, el snapshot CMU no se transfiere: el mismo wrapper lo
+recolecta localmente antes de cada análisis. La entrada `CMU_ETHICS_PUBLIC_METADATA` del acta se usa
+sólo si se prepara un replay controlado o se transfiere un snapshot ya validado entre hosts. Nunca
+incluya `cases.ndjson` en Git ni en un artefacto de CI.
+
 Verificación mínima antes de iniciar PM2:
 
 ```bash
 cd /srv/medicos-backend/current
 find /srv/medicos-backend/data -type f -name manifest.json -print
 sha256sum /srv/medicos-backend/data/processed/*/*/manifest.json
+find /srv/medicos-backend/data/normalized/ethics/cmu \
+  -mindepth 2 -maxdepth 2 -type f -name manifest.json -print
 test "$(stat -c '%U:%G %a' /etc/medicos-backend/private-analysis.env)" = "root:root 600"
 test -r /etc/medicos-backend/private-analysis.env
 test -w /var/lib/medicos-backend/logs/private-analysis
+test -w /srv/medicos-backend/data/normalized/ethics/cmu
 ```
 
 Seleccione explícitamente los paths en el env para un replay. Déjelos vacíos sólo cuando el
@@ -210,6 +243,23 @@ pm2 status medicos-private-analysis
 pm2 logs medicos-private-analysis --lines 200 --nostream
 cat /var/lib/medicos-backend/logs/private-analysis/latest.json
 
+# El snapshot más reciente debe existir, conservar las salvaguardas y rechazar exportación pública.
+CMU_MANIFEST="$(
+  find /srv/medicos-backend/data/normalized/ethics/cmu \
+    -mindepth 2 -maxdepth 2 -type f -name manifest.json -print |
+    sort | tail -n 1
+)"
+test -n "${CMU_MANIFEST}"
+jq -e '
+  .collectionMode == "AUTOMATED_PUBLIC_METADATA_SNAPSHOT" and
+  .safeguards.robotsPolicyFailClosed == true and
+  .safeguards.uploadedDocumentsFetched == false and
+  .safeguards.pageContentPersisted == false and
+  .safeguards.automaticIdentityConfirmation == false and
+  .safeguards.publicExportAllowed == false
+' "${CMU_MANIFEST}" >/dev/null
+unset CMU_MANIFEST
+
 # Debe haber una sola fila online y cron 37 6 * * *.
 pm2 jlist | jq '.[] | select(.name == "medicos-private-analysis") |
   {status: .pm2_env.status, instances: .pm2_env.instances,
@@ -228,6 +278,15 @@ GROUP BY status ORDER BY status;
 SELECT run_id, snapshot_id, status, started_at, heartbeat_at, completed_at
 FROM research_private.analysis_run
 ORDER BY created_at DESC LIMIT 5;
+
+SELECT count(*) AS cmu_ethics_cases
+FROM research_private.ethics_case
+WHERE publisher = 'Colegio Médico del Uruguay';
+
+SELECT match_kind, count(*) AS candidates
+FROM research_private.professional_ethics_candidate
+GROUP BY match_kind
+ORDER BY match_kind;
 
 SELECT count(*) FROM catalog.public_professional;
 SELECT count(*) FROM catalog.public_professional_route WHERE route_kind = 'CURRENT';
@@ -264,6 +323,11 @@ supresión automática intacta; cualquier intervención posterior del operador c
   `--update-env` para inyectar secretos.
 - `SKIPPED_OVERLAP`: identifique el dueño del lock y el run PostgreSQL antes de reiniciar.
 - `FAILED`: conserve artefactos y último dossier válido, corrija la causa y reinicie una sola vez.
+- `ROBOTS_HASH_MISMATCH` o rechazo de política: no cambie el hash ni fuerce la descarga en el
+  servidor. Revise manualmente `robots.txt`, el sitemap y el alcance permitido; cualquier nueva
+  huella requiere cambio de código revisado y pruebas.
+- fallo del recolector: no reutilice un directorio incompleto. El instalador atómico conserva el
+  snapshot anterior y el análisis no se inicia.
 - `INTERRUPTED`: confirme que el lease/advisory lock expiró o fue liberado antes del replay.
 - Presión de memoria: no aumente límites a ciegas; reduzca `PROFESSIONAL_ANALYSIS_BATCH_SIZE` y mida.
 - Rotación de credenciales: detenga PM2, rote la contraseña, actualice el archivo 0600 y reinicie.

@@ -42,6 +42,8 @@ module.exports = {
       min_uptime: 10000,
 
       // Server 104 and its PM2 daemon use UTC. This is 03:37 America/Montevideo (UTC-03:00).
+      // Each restart runs CMU metadata collection, private analysis, then the MSP projection
+      // sequentially under one lock; any failed stage prevents the following stages.
       cron_restart: '37 6 * * *',
 
       max_memory_restart: '1536M',

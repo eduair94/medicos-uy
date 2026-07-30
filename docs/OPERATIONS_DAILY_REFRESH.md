@@ -16,6 +16,11 @@ coincidencias.
 7. genera candidatos de vinculación institucional;
 8. construye un snapshot factual interno.
 
+Los metadatos públicos del Tribunal de Ética del Colegio Médico no forman parte de este
+orquestador. En servidor 104 los recolecta `medicos-private-analysis`, bajo su propio lock,
+inmediatamente antes del análisis privado diario. No agregue un segundo cron para CMU: produciría
+snapshots duplicados y dificultaría atribuir fallos de política o cobertura.
+
 El plan puede inspeccionarse sin red ni escritura:
 
 ```bash
