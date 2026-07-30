@@ -29,6 +29,7 @@
     "class-transformer": "catalog:",
     "class-validator": "catalog:",
     "fastify": "catalog:",
+    "firebase-admin": "catalog:",
     "nestjs-pino": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:"

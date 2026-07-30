@@ -110,25 +110,97 @@ const corsOriginsSchema = z
   )
   .pipe(z.array(corsOriginSchema).min(1).max(20));
 
+const firebaseOwnerUidsSchema = z
+  .string()
+  .optional()
+  .transform((value) =>
+    value === undefined
+      ? []
+      : value
+          .split(',')
+          .map((uid) => uid.trim())
+          .filter((uid) => uid.length > 0),
+  )
+  .pipe(z.array(z.string().min(1).max(128)).max(100));
+
 const baseEnvironmentSchema = z.object({
   NODE_ENV: nodeEnvironmentSchema.default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   CORS_ORIGINS: corsOriginsSchema,
   API_DOCUMENTATION_ENABLED: booleanFromEnvironment.optional(),
   SWAGGER_ENABLED: booleanFromEnvironment.optional(),
+  FIREBASE_PROJECT_ID: z.string().trim().min(1).max(128).optional(),
+  FIREBASE_OWNER_UIDS: firebaseOwnerUidsSchema,
+  OWNER_API_BASIC_USERNAME: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9._-]+$/u)
+    .default('owner'),
+  OWNER_API_KEY_SHA256: z
+    .string()
+    .trim()
+    .transform((value) => value.toLowerCase())
+    .pipe(z.string().regex(/^[0-9a-f]{64}$/u))
+    .optional(),
   HTTP_RATE_LIMIT_MAX: z.coerce.number().int().positive().max(10_000).default(100),
   HTTP_RATE_LIMIT_WINDOW: z.string().trim().min(1).default('1 minute'),
 });
 
+interface OwnerAuthenticationEnvironment {
+  readonly FIREBASE_PROJECT_ID?: string | undefined;
+  readonly FIREBASE_OWNER_UIDS: readonly string[];
+  readonly OWNER_API_KEY_SHA256?: string | undefined;
+}
+
+function addOwnerAuthenticationIssues(
+  environment: OwnerAuthenticationEnvironment,
+  context: {
+    addIssue(issue: {
+      readonly code: 'custom';
+      readonly path: PropertyKey[];
+      readonly message: string;
+    }): void;
+  },
+): void {
+  const firebaseProjectConfigured = environment.FIREBASE_PROJECT_ID !== undefined;
+  const firebaseOwnersConfigured = environment.FIREBASE_OWNER_UIDS.length > 0;
+  const firebaseConfigured = firebaseProjectConfigured && firebaseOwnersConfigured;
+  const apiKeyConfigured = environment.OWNER_API_KEY_SHA256 !== undefined;
+
+  if (firebaseProjectConfigured !== firebaseOwnersConfigured) {
+    context.addIssue({
+      code: 'custom',
+      path: firebaseProjectConfigured ? ['FIREBASE_OWNER_UIDS'] : ['FIREBASE_PROJECT_ID'],
+      message: 'must be configured together with Firebase owner authentication',
+    });
+  }
+
+  if (!firebaseConfigured && !apiKeyConfigured) {
+    context.addIssue({
+      code: 'custom',
+      path: ['OWNER_API_KEY_SHA256'],
+      message:
+        'at least one owner authentication method is required (Firebase owner UIDs or an API key hash)',
+    });
+  }
+}
+
 const publicQueryApiEnvironmentSchema = baseEnvironmentSchema
   .extend({
     PUBLIC_QUERY_API_PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
+    PUBLIC_QUERY_API_HOST: z.enum(['0.0.0.0', '127.0.0.1', '::1']).default('0.0.0.0'),
     PUBLIC_API_BASE_URL: publicHttpBaseUrlSchema.optional(),
     CATALOG_DATABASE_URL: postgresConnectionUrlSchema,
     CATALOG_DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
     CATALOG_DATABASE_SSL: booleanFromEnvironment.default(false),
+    OWNER_RESEARCH_DATABASE_URL: postgresConnectionUrlSchema,
+    OWNER_RESEARCH_DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(4),
   })
   .superRefine((environment, context) => {
+    addOwnerAuthenticationIssues(environment, context);
+
     const documentationEnabled =
       environment.API_DOCUMENTATION_ENABLED ?? environment.SWAGGER_ENABLED ?? false;
 
@@ -140,7 +212,7 @@ const publicQueryApiEnvironmentSchema = baseEnvironmentSchema
       context.addIssue({
         code: 'custom',
         path: ['PUBLIC_API_BASE_URL'],
-        message: 'is required in production when public API documentation is enabled',
+        message: 'is required in production when API documentation is enabled',
       });
     }
   })
@@ -153,7 +225,7 @@ const publicQueryApiEnvironmentSchema = baseEnvironmentSchema
       API_DOCUMENTATION_ENABLED: documentationEnabled,
       PUBLIC_API_BASE_URL:
         environment.PUBLIC_API_BASE_URL ?? `http://localhost:${environment.PUBLIC_QUERY_API_PORT}`,
-      HOST: '0.0.0.0',
+      HOST: environment.PUBLIC_QUERY_API_HOST,
       PORT: environment.PUBLIC_QUERY_API_PORT,
       SERVICE_NAME: 'public-query-api',
     };
@@ -162,6 +234,9 @@ const publicQueryApiEnvironmentSchema = baseEnvironmentSchema
 const commandApiEnvironmentSchema = baseEnvironmentSchema
   .extend({
     COMMAND_API_PORT: z.coerce.number().int().min(1).max(65_535).default(3002),
+  })
+  .superRefine((environment, context) => {
+    addOwnerAuthenticationIssues(environment, context);
   })
   .transform((environment) => {
     const documentationEnabled =

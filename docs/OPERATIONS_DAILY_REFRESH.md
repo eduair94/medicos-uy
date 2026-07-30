@@ -12,8 +12,14 @@ coincidencias.
 4. ejecuta los adaptadores habilitados de CASMU, Asociación Española, SMI, Médica Uruguaya y
    Hospital Británico;
 5. lee únicamente índices de noticias autorizados;
-6. genera candidatos de vinculación en cuarentena;
-7. construye un snapshot factual interno.
+6. genera candidatos de noticias en cuarentena a partir del lote recién recolectado;
+7. genera candidatos de vinculación institucional;
+8. construye un snapshot factual interno.
+
+Los metadatos públicos del Tribunal de Ética del Colegio Médico no forman parte de este
+orquestador. En servidor 104 los recolecta `medicos-private-analysis`, bajo su propio lock,
+inmediatamente antes del análisis privado diario. No agregue un segundo cron para CMU: produciría
+snapshots duplicados y dificultaría atribuir fallos de política o cobertura.
 
 El plan puede inspeccionarse sin red ni escritura:
 
@@ -35,9 +41,17 @@ El pipeline declara explícitamente:
 - no mutar la base de la API;
 - no convertir un score de revisión en probabilidad.
 
-La carga transaccional de una exportación aprobada a PostgreSQL debe implementarse como un adaptador
-independiente antes de poder afirmar que la API se actualiza sola. Hasta entonces el cron refresca
-la zona de investigación y el catálogo público continúa con el último release aprobado.
+La proyección transaccional mínima MSP está implementada como
+`data:sync:msp-catalog` y se ejecuta en el scheduler PM2 después de un análisis correcto. Consume
+exclusivamente el último snapshot privado completo y una aprobación operativa explícita; no
+proyecta candidatos ni fuentes web. El identificador del snapshot queda fijado en el entorno y la
+función rechaza cualquier lote distinto, aunque sea más reciente. Este pipeline diario de
+recolección todavía no importa por sí
+mismo el nuevo snapshot a PostgreSQL: esa transferencia verificada debe terminar antes de ejecutar
+la proyección. Tras el `COMMIT`, el mismo proceso actualiza las estadísticas del planificador sobre
+un conjunto fijo de tablas mediante una función de privilegio mínimo. Un fallo de `ANALYZE` marca la
+ejecución como fallida, pero no intenta revertir la proyección ya confirmada; el siguiente cron
+idempotente repite la actualización.
 
 ## Variables
 
@@ -48,6 +62,7 @@ y complete los secretos fuera del repositorio.
 | ------------------------------------- | ----------- | ----------------------------------------- |
 | `DATA_INGESTION_DIR`                  | `data`      | raíz común de artefactos                  |
 | `MSP_LINKAGE_HMAC_KEY`                | sin default | seudonimización interna del documento MSP |
+| `NODE_EXTRA_CA_CERTS`                 | del sistema | CA adicional oficial si el host la omite  |
 | `DAILY_REFRESH_MUTUALISTAS`           | todas       | allowlist CSV de adaptadores              |
 | `DAILY_REFRESH_NEWS_ENABLED`          | `true`      | habilita índices con política vigente     |
 | `DAILY_REFRESH_PUBLIC_EXPORT_ENABLED` | `false`     | agrega el exportador firmado              |
@@ -55,6 +70,11 @@ y complete los secretos fuera del repositorio.
 
 Los booleanos deben ser explícitos (`true/false`, `1/0`, `yes/no`, `on/off`). Un nombre de
 mutualista desconocido aborta antes de descargar.
+
+No use `MSP_ALLOW_INSECURE_TLS=true` para resolver una cadena incompleta. Instale la CA oficial en
+el almacén del sistema o configure `NODE_EXTRA_CA_CERTS` con un archivo verificado, de propiedad de
+root y no escribible por el usuario del servicio. La variable debe existir antes de iniciar cada
+proceso Node; el orquestador diario la hereda a todas las etapas.
 
 ## Estado y observabilidad
 
@@ -154,3 +174,17 @@ sudo -u medicos /usr/local/sbin/medicos-daily-refresh
 No se recomienda GitHub Actions para este cron: obligaría a trasladar secretos y potenciales datos
 personales a runners externos o abrir PostgreSQL a rangos cambiantes. GitHub Actions se limita a CI
 con fixtures sintéticos.
+
+## Enriquecimiento web opcional
+
+Mantenga `DAILY_REFRESH_WEB_ENRICHMENT_ENABLED=false` hasta instalar fuera del repositorio una
+política vigente en `WEB_ENRICHMENT_SOURCE_POLICY_PATH`. Antes de habilitar el cron:
+
+```bash
+sudo -u medicos pnpm data:enrich:web:plan
+sudo -u medicos pnpm data:enrich:web:tick
+```
+
+Compruebe que el manifiesto declara `publicExportAllowed=false`, que `coverage.ndjson` tiene una
+fila por perfil MSP y que una falla de fuente se representa como `PARTIAL_SOURCE_FAILURE`. La etapa
+es interna y no es entrada de `data:build:directory`.

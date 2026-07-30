@@ -48,6 +48,7 @@ jobs:
             git status --short -- drizzle/catalog/migrations
             exit 1
           fi
+          corepack pnpm db:verify:owner-research-files
 
       - name: Run quality gate
         run: corepack pnpm quality

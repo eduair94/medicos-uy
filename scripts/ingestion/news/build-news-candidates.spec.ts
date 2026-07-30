@@ -26,6 +26,7 @@ function articleManifest(options: {
   readonly records: number;
   readonly generatedAt?: string;
   readonly expiresAt?: string;
+  readonly articlesRelativePath?: string;
 }): string {
   const generatedAt = options.generatedAt ?? '2026-07-27T14:00:00.000Z';
   const firstArticle =
@@ -121,7 +122,7 @@ function articleManifest(options: {
     },
     outputs: {
       articles: {
-        relativePath: 'normalized/articles.ndjson',
+        relativePath: options.articlesRelativePath ?? 'normalized/articles.ndjson',
         sha256: sha256(options.articlesContent),
         records: options.records,
         schemaVersion: 1,
@@ -163,9 +164,10 @@ describe('runNewsCandidateBuild', () => {
     const dataDirectory = await mkdtemp(join(tmpdir(), 'medicos-news-candidates-'));
     temporaryDirectories.push(dataDirectory);
     const inputDirectory = join(dataDirectory, 'normalized');
-    await mkdir(inputDirectory, { recursive: true });
+    const newsInputDirectory = join(inputDirectory, 'news', 'news-index-v1-fixture');
+    await mkdir(newsInputDirectory, { recursive: true });
     const professionalsPath = join(inputDirectory, 'professionals.ndjson');
-    const articlesPath = join(inputDirectory, 'articles.ndjson');
+    const articlesPath = join(newsInputDirectory, 'articles.ndjson');
     const professional = {
       linkageId: `msp_doc_v1_${'a'.repeat(64)}`,
       fullName: 'Ada Prueba Médica Uno',
@@ -211,18 +213,18 @@ describe('runNewsCandidateBuild', () => {
       writeFile(professionalsPath, professionalsContent),
       writeFile(articlesPath, articlesContent),
       writeFile(
-        join(inputDirectory, 'manifest.json'),
+        join(newsInputDirectory, 'manifest.json'),
         articleManifest({
           articlesContent,
           professionalsContent,
           records: 1,
+          articlesRelativePath: 'normalized/news/news-index-v1-fixture/articles.ndjson',
         }),
       ),
     ]);
     const environment = {
       DATA_INGESTION_DIR: dataDirectory,
       NEWS_PROFESSIONALS_PATH: professionalsPath,
-      NEWS_ARTICLES_PATH: articlesPath,
     };
 
     const result = await runNewsCandidateBuild(environment, {

@@ -9,6 +9,7 @@ describe('log redaction policy', () => {
   it.each([
     'req.headers.authorization',
     'req.headers.cookie',
+    'req.headers.x-api-key',
     'req.headers.x-firebase-appcheck',
     '*.token',
   ])('redacts %s', (path) => {

@@ -10,11 +10,28 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { Logger as PinoLogger } from 'nestjs-pino';
 
 import { registerApiDocumentation, type ApiDocumentationOptions } from './api-documentation';
+import {
+  createOwnerAuthenticator,
+  resolveEnabledOwnerAuthenticationMethods,
+  type OwnerAuthenticationConfiguration,
+  type OwnerAuthenticator,
+} from './owner-authentication';
+import {
+  asOwnerAuthenticationHeaders,
+  createOwnerAuthenticationHook,
+  type OwnerAuthenticationCache,
+} from './owner-authentication-hook';
 import { ProblemDetailsFilter } from './problem-details.filter';
+
+import type { FastifyRequest } from 'fastify';
 
 export interface ConfigureHttpApplicationOptions {
   readonly rateLimitMax?: number;
   readonly apiDocumentation?: Partial<ApiDocumentationOptions>;
+  readonly ownerAuthentication?: {
+    readonly basicEnabled?: boolean;
+  };
+  readonly ownerAuthenticator?: OwnerAuthenticator;
   /** @deprecated Use apiDocumentation.enabled. */
   readonly swagger?: boolean;
 }
@@ -28,6 +45,21 @@ export function createFastifyAdapter(): FastifyAdapter {
   });
 }
 
+export async function createOwnerRateLimitKey(
+  request: FastifyRequest,
+  authenticator: OwnerAuthenticator,
+  authenticationCache: OwnerAuthenticationCache,
+): Promise<string> {
+  const authenticated = await authenticator.authenticate(asOwnerAuthenticationHeaders(request));
+  authenticationCache.set(request, authenticated);
+
+  if (!authenticated) {
+    return `anonymous:${request.ip}`;
+  }
+
+  return 'authenticated:owner';
+}
+
 export async function configureHttpApplication(
   app: NestFastifyApplication,
   options: ConfigureHttpApplicationOptions = {},
@@ -39,6 +71,23 @@ export async function configureHttpApplication(
     config.get<boolean>('API_DOCUMENTATION_ENABLED', config.get<boolean>('SWAGGER_ENABLED', false));
   const corsOrigins = config.get<readonly string[]>('CORS_ORIGINS', []);
   const fastify = app.getHttpAdapter().getInstance();
+  const ownerAuthenticationConfiguration: OwnerAuthenticationConfiguration = {
+    basicEnabled: options.ownerAuthentication?.basicEnabled ?? false,
+    firebaseOwnerUids: config.get<readonly string[]>('FIREBASE_OWNER_UIDS', []),
+    ownerApiBasicUsername: config.get<string>('OWNER_API_BASIC_USERNAME', 'owner'),
+    ...(config.get<string>('FIREBASE_PROJECT_ID') === undefined
+      ? {}
+      : { firebaseProjectId: config.getOrThrow<string>('FIREBASE_PROJECT_ID') }),
+    ...(config.get<string>('OWNER_API_KEY_SHA256') === undefined
+      ? {}
+      : { ownerApiKeySha256: config.getOrThrow<string>('OWNER_API_KEY_SHA256') }),
+  };
+  const enabledOwnerAuthenticationMethods = resolveEnabledOwnerAuthenticationMethods(
+    ownerAuthenticationConfiguration,
+  );
+  const ownerAuthenticator =
+    options.ownerAuthenticator ?? createOwnerAuthenticator(ownerAuthenticationConfiguration);
+  const ownerAuthenticationCache: OwnerAuthenticationCache = new WeakMap();
 
   fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header('x-request-id', request.id);
@@ -84,9 +133,20 @@ export async function configureHttpApplication(
   await app.register(rateLimit, {
     allowList: (request) => request.url === '/health/live' || request.url === '/health/ready',
     global: true,
+    keyGenerator: (request) =>
+      createOwnerRateLimitKey(request, ownerAuthenticator, ownerAuthenticationCache),
     max: options.rateLimitMax ?? config.get<number>('HTTP_RATE_LIMIT_MAX', 100),
     timeWindow: config.get<string>('HTTP_RATE_LIMIT_WINDOW', '1 minute'),
   });
+
+  fastify.addHook(
+    'onRequest',
+    createOwnerAuthenticationHook(
+      ownerAuthenticator,
+      enabledOwnerAuthenticationMethods,
+      ownerAuthenticationCache,
+    ),
+  );
 
   if (apiDocumentationEnabled) {
     const serviceName = config.get<string>('SERVICE_NAME', 'medicos-api');
@@ -96,12 +156,13 @@ export async function configureHttpApplication(
       config.get<string>('PUBLIC_API_BASE_URL', `http://localhost:${port}`);
 
     registerApiDocumentation(app, {
+      authentication: enabledOwnerAuthenticationMethods,
       enabled: true,
       publicBaseUrl,
       title: options.apiDocumentation?.title ?? serviceName,
       description:
         options.apiDocumentation?.description ??
-        'API pública de consulta del directorio médico uruguayo. Solo expone datos factuales aprobados y su procedencia; no constituye asesoramiento médico ni jurídico.',
+        'API privada de consulta del directorio médico uruguayo para el propietario. Conserva procedencia, estados de verificación y advertencias; no constituye asesoramiento médico ni jurídico.',
       version: options.apiDocumentation?.version ?? '1.0.0',
       repositoryUrl:
         options.apiDocumentation?.repositoryUrl ?? 'https://github.com/eduair94/medicos-uy',

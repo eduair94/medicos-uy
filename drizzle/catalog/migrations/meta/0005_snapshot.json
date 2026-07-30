@@ -1,0 +1,1404 @@
+{
+  "id": "1920917b-3b12-4391-ad44-c93f57d3c4b1",
+  "prevId": "5781af74-5655-48c3-b124-cbb135836cff",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "provenance.evidence_claim": {
+      "name": "evidence_claim",
+      "schema": "provenance",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "evidence_id": {
+          "name": "evidence_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject_id": {
+          "name": "subject_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "claim_kind": {
+          "name": "claim_kind",
+          "type": "evidence_claim_kind",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_value": {
+          "name": "normalized_value",
+          "type": "varchar(250)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_evidence_claim_fact": {
+          "name": "uq_evidence_claim_fact",
+          "columns": [
+            {
+              "expression": "evidence_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "subject_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "claim_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_value",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_evidence_claim_subject": {
+          "name": "ix_evidence_claim_subject",
+          "columns": [
+            {
+              "expression": "subject_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "claim_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_value",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "evidence_claim_evidence_id_evidence_ref_id_fk": {
+          "name": "evidence_claim_evidence_id_evidence_ref_id_fk",
+          "tableFrom": "evidence_claim",
+          "tableTo": "evidence_ref",
+          "schemaTo": "provenance",
+          "columnsFrom": [
+            "evidence_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_evidence_claim_value_non_blank": {
+          "name": "ck_evidence_claim_value_non_blank",
+          "value": "length(trim(\"provenance\".\"evidence_claim\".\"normalized_value\")) > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "provenance.evidence_ref": {
+      "name": "evidence_ref",
+      "schema": "provenance",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "public_id": {
+          "name": "public_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "source_release_id": {
+          "name": "source_release_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_url": {
+          "name": "canonical_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checksum": {
+          "name": "checksum",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attribution": {
+          "name": "attribution",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publication_state": {
+          "name": "publication_state",
+          "type": "evidence_publication_state",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "evidence_confidence",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CANDIDATE'"
+        },
+        "valid_until": {
+          "name": "valid_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_evidence_ref_public_id": {
+          "name": "uq_evidence_ref_public_id",
+          "columns": [
+            {
+              "expression": "public_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_evidence_ref_source_release": {
+          "name": "ix_evidence_ref_source_release",
+          "columns": [
+            {
+              "expression": "source_release_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "evidence_ref_source_release_id_source_release_id_fk": {
+          "name": "evidence_ref_source_release_id_source_release_id_fk",
+          "tableFrom": "evidence_ref",
+          "tableTo": "source_release",
+          "schemaTo": "provenance",
+          "columnsFrom": [
+            "source_release_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_approved_evidence_requires_publishable_confidence": {
+          "name": "ck_approved_evidence_requires_publishable_confidence",
+          "value": "\"provenance\".\"evidence_ref\".\"publication_state\" <> 'APPROVED' OR \"provenance\".\"evidence_ref\".\"confidence\" <> 'CANDIDATE'"
+        },
+        "ck_evidence_ref_distinct_public_id": {
+          "name": "ck_evidence_ref_distinct_public_id",
+          "value": "\"provenance\".\"evidence_ref\".\"public_id\" <> \"provenance\".\"evidence_ref\".\"id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "ingestion_private.snapshot": {
+      "name": "snapshot",
+      "schema": "ingestion_private",
+      "columns": {
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "varchar(120)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "manifest_sha256": {
+          "name": "manifest_sha256",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profiles_sha256": {
+          "name": "profiles_sha256",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profile_count": {
+          "name": "profile_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_generated_at": {
+          "name": "source_generated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "imported_at": {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_private_snapshot_id_factual_v3": {
+          "name": "ck_private_snapshot_id_factual_v3",
+          "value": "\"ingestion_private\".\"snapshot\".\"snapshot_id\" ~ '^factual-v3-[0-9a-f]{16}$'"
+        },
+        "ck_private_snapshot_manifest_sha256": {
+          "name": "ck_private_snapshot_manifest_sha256",
+          "value": "\"ingestion_private\".\"snapshot\".\"manifest_sha256\" ~ '^[0-9a-f]{64}$'"
+        },
+        "ck_private_snapshot_profiles_sha256": {
+          "name": "ck_private_snapshot_profiles_sha256",
+          "value": "\"ingestion_private\".\"snapshot\".\"profiles_sha256\" ~ '^[0-9a-f]{64}$'"
+        },
+        "ck_private_snapshot_profile_count": {
+          "name": "ck_private_snapshot_profile_count",
+          "value": "\"ingestion_private\".\"snapshot\".\"profile_count\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "ingestion_private.professional_profile": {
+      "name": "professional_profile",
+      "schema": "ingestion_private",
+      "columns": {
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "internal_hmac_id": {
+          "name": "internal_hmac_id",
+          "type": "varchar(75)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_name": {
+          "name": "normalized_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registered_titles": {
+          "name": "registered_titles",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "official_registry": {
+          "name": "official_registry",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "record_sha256": {
+          "name": "record_sha256",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "ix_private_professional_profile_name": {
+          "name": "ix_private_professional_profile_name",
+          "columns": [
+            {
+              "expression": "snapshot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "professional_profile_snapshot_id_snapshot_snapshot_id_fk": {
+          "name": "professional_profile_snapshot_id_snapshot_snapshot_id_fk",
+          "tableFrom": "professional_profile",
+          "tableTo": "snapshot",
+          "schemaTo": "ingestion_private",
+          "columnsFrom": [
+            "snapshot_id"
+          ],
+          "columnsTo": [
+            "snapshot_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "pk_private_professional_profile": {
+          "name": "pk_private_professional_profile",
+          "columns": [
+            "snapshot_id",
+            "internal_hmac_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_private_professional_hmac_id": {
+          "name": "ck_private_professional_hmac_id",
+          "value": "\"ingestion_private\".\"professional_profile\".\"internal_hmac_id\" ~ '^msp_doc_v1_[0-9a-f]{64}$'"
+        },
+        "ck_private_professional_display_name": {
+          "name": "ck_private_professional_display_name",
+          "value": "length(trim(\"ingestion_private\".\"professional_profile\".\"display_name\")) > 0"
+        },
+        "ck_private_professional_normalized_name": {
+          "name": "ck_private_professional_normalized_name",
+          "value": "length(trim(\"ingestion_private\".\"professional_profile\".\"normalized_name\")) > 0"
+        },
+        "ck_private_professional_record_sha256": {
+          "name": "ck_private_professional_record_sha256",
+          "value": "\"ingestion_private\".\"professional_profile\".\"record_sha256\" ~ '^[0-9a-f]{64}$'"
+        },
+        "ck_private_professional_registered_titles_array": {
+          "name": "ck_private_professional_registered_titles_array",
+          "value": "jsonb_typeof(\"ingestion_private\".\"professional_profile\".\"registered_titles\") = 'array'"
+        },
+        "ck_private_professional_official_registry_object": {
+          "name": "ck_private_professional_official_registry_object",
+          "value": "jsonb_typeof(\"ingestion_private\".\"professional_profile\".\"official_registry\") = 'object'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "catalog.professional_route": {
+      "name": "professional_route",
+      "schema": "catalog",
+      "columns": {
+        "slug": {
+          "name": "slug",
+          "type": "varchar(180)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "professional_id": {
+          "name": "professional_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_kind": {
+          "name": "route_kind",
+          "type": "professional_route_kind",
+          "typeSchema": "catalog",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_professional_current_route": {
+          "name": "uq_professional_current_route",
+          "columns": [
+            {
+              "expression": "professional_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"catalog\".\"professional_route\".\"route_kind\" = 'CURRENT'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_professional_route_professional": {
+          "name": "ix_professional_route_professional",
+          "columns": [
+            {
+              "expression": "professional_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "professional_route_professional_id_professional_id_fk": {
+          "name": "professional_route_professional_id_professional_id_fk",
+          "tableFrom": "professional_route",
+          "tableTo": "professional",
+          "schemaTo": "catalog",
+          "columnsFrom": [
+            "professional_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_professional_route_slug_format": {
+          "name": "ck_professional_route_slug_format",
+          "value": "\"catalog\".\"professional_route\".\"slug\" ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'"
+        },
+        "ck_professional_route_slug_not_uuid": {
+          "name": "ck_professional_route_slug_not_uuid",
+          "value": "NOT (\"catalog\".\"professional_route\".\"slug\" ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "catalog.professional": {
+      "name": "professional",
+      "schema": "catalog",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "public_id": {
+          "name": "public_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_name": {
+          "name": "normalized_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "professional_visibility",
+          "typeSchema": "catalog",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_name_evidence_id": {
+          "name": "current_name_evidence_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_professional_public_id": {
+          "name": "uq_professional_public_id",
+          "columns": [
+            {
+              "expression": "public_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_professional_directory": {
+          "name": "ix_professional_directory",
+          "columns": [
+            {
+              "expression": "visibility",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "public_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_professional_distinct_public_id": {
+          "name": "ck_professional_distinct_public_id",
+          "value": "\"catalog\".\"professional\".\"public_id\" <> \"catalog\".\"professional\".\"id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "credentials.registered_title": {
+      "name": "registered_title",
+      "schema": "credentials",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "public_id": {
+          "name": "public_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "professional_id": {
+          "name": "professional_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(250)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_title": {
+          "name": "normalized_title",
+          "type": "varchar(250)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registration_state": {
+          "name": "registration_state",
+          "type": "registered_title_state",
+          "typeSchema": "credentials",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "temporary_registration": {
+          "name": "temporary_registration",
+          "type": "temporary_registration_kind",
+          "typeSchema": "credentials",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NONE'"
+        },
+        "current_evidence_id": {
+          "name": "current_evidence_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_registered_title_public_id": {
+          "name": "uq_registered_title_public_id",
+          "columns": [
+            {
+              "expression": "public_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_registered_title_professional_title": {
+          "name": "uq_registered_title_professional_title",
+          "columns": [
+            {
+              "expression": "professional_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_title",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_registered_title_public_lookup": {
+          "name": "ix_registered_title_public_lookup",
+          "columns": [
+            {
+              "expression": "professional_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "registration_state",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_title",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_registered_title_non_blank": {
+          "name": "ck_registered_title_non_blank",
+          "value": "length(trim(\"credentials\".\"registered_title\".\"title\")) > 0"
+        },
+        "ck_registered_title_normalized_non_blank": {
+          "name": "ck_registered_title_normalized_non_blank",
+          "value": "length(trim(\"credentials\".\"registered_title\".\"normalized_title\")) > 0"
+        },
+        "ck_registered_title_distinct_public_id": {
+          "name": "ck_registered_title_distinct_public_id",
+          "value": "\"credentials\".\"registered_title\".\"public_id\" <> \"credentials\".\"registered_title\".\"id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "provenance.source_release": {
+      "name": "source_release",
+      "schema": "provenance",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "upstream_release_key": {
+          "name": "upstream_release_key",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cutoff_date": {
+          "name": "cutoff_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "retrieved_at": {
+          "name": "retrieved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_source_release_upstream_key": {
+          "name": "uq_source_release_upstream_key",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "upstream_release_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ix_source_release_freshness": {
+          "name": "ix_source_release_freshness",
+          "columns": [
+            {
+              "expression": "source_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cutoff_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "retrieved_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "source_release_source_id_source_id_fk": {
+          "name": "source_release_source_id_source_id_fk",
+          "tableFrom": "source_release",
+          "tableTo": "source",
+          "schemaTo": "provenance",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "provenance.source": {
+      "name": "source",
+      "schema": "provenance",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_url": {
+          "name": "canonical_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_kind": {
+          "name": "source_kind",
+          "type": "source_kind",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "publication_state": {
+          "name": "publication_state",
+          "type": "source_publication_state",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "purpose_compatibility": {
+          "name": "purpose_compatibility",
+          "type": "source_purpose_compatibility",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "reuse_basis": {
+          "name": "reuse_basis",
+          "type": "source_reuse_basis",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "license_url": {
+          "name": "license_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publication_policy_id": {
+          "name": "publication_policy_id",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publication_reviewed_by": {
+          "name": "publication_reviewed_by",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publication_reviewed_at": {
+          "name": "publication_reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publication_review_reference": {
+          "name": "publication_review_reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publication_valid_until": {
+          "name": "publication_valid_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ck_source_approved_requires_complete_review": {
+          "name": "ck_source_approved_requires_complete_review",
+          "value": "\"provenance\".\"source\".\"publication_state\" <> 'APPROVED'\n          OR (\n            \"provenance\".\"source\".\"purpose_compatibility\" = 'COMPATIBLE'\n            AND \"provenance\".\"source\".\"reuse_basis\" <> 'PENDING'\n            AND \"provenance\".\"source\".\"publication_policy_id\" IS NOT NULL\n            AND \"provenance\".\"source\".\"publication_reviewed_by\" IS NOT NULL\n            AND \"provenance\".\"source\".\"publication_reviewed_at\" IS NOT NULL\n            AND \"provenance\".\"source\".\"publication_review_reference\" IS NOT NULL\n            AND \"provenance\".\"source\".\"publication_valid_until\" IS NOT NULL\n            AND length(trim(\"provenance\".\"source\".\"publication_policy_id\")) > 0\n            AND length(trim(\"provenance\".\"source\".\"publication_reviewed_by\")) > 0\n            AND length(trim(\"provenance\".\"source\".\"publication_review_reference\")) > 0\n            AND \"provenance\".\"source\".\"publication_valid_until\" > \"provenance\".\"source\".\"publication_reviewed_at\"\n            AND (\n              \"provenance\".\"source\".\"reuse_basis\" <> 'OPEN_DATA_LICENSE'\n              OR (\n                \"provenance\".\"source\".\"license_url\" IS NOT NULL\n                AND length(trim(\"provenance\".\"source\".\"license_url\")) > 0\n              )\n            )\n            AND (\n              \"provenance\".\"source\".\"reuse_basis\" <> 'DATA_SUBJECT_CONSENT'\n              OR \"provenance\".\"source\".\"source_kind\" = 'DATA_SUBJECT_CLAIM'\n            )\n            AND (\n              \"provenance\".\"source\".\"source_kind\" <> 'DATA_SUBJECT_CLAIM'\n              OR \"provenance\".\"source\".\"reuse_basis\" = 'DATA_SUBJECT_CONSENT'\n            )\n          )"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "provenance.evidence_claim_kind": {
+      "name": "evidence_claim_kind",
+      "schema": "provenance",
+      "values": [
+        "PROFESSIONAL_NAME",
+        "REGISTERED_TITLE"
+      ]
+    },
+    "provenance.evidence_confidence": {
+      "name": "evidence_confidence",
+      "schema": "provenance",
+      "values": [
+        "CANDIDATE",
+        "DETERMINISTIC",
+        "HUMAN_VERIFIED",
+        "DATA_SUBJECT_CLAIMED"
+      ]
+    },
+    "provenance.evidence_publication_state": {
+      "name": "evidence_publication_state",
+      "schema": "provenance",
+      "values": [
+        "PENDING",
+        "APPROVED",
+        "REVOKED"
+      ]
+    },
+    "catalog.professional_route_kind": {
+      "name": "professional_route_kind",
+      "schema": "catalog",
+      "values": [
+        "CURRENT",
+        "REDIRECT"
+      ]
+    },
+    "catalog.professional_visibility": {
+      "name": "professional_visibility",
+      "schema": "catalog",
+      "values": [
+        "PUBLIC",
+        "SUPPRESSED",
+        "MERGED",
+        "ARCHIVED"
+      ]
+    },
+    "credentials.registered_title_state": {
+      "name": "registered_title_state",
+      "schema": "credentials",
+      "values": [
+        "ENABLED",
+        "DISABLED",
+        "UNDER_REVIEW",
+        "WITHDRAWN"
+      ]
+    },
+    "provenance.source_kind": {
+      "name": "source_kind",
+      "schema": "provenance",
+      "values": [
+        "GOVERNMENT_OPEN_DATA",
+        "OFFICIAL_PUBLICATION",
+        "PROVIDER_AUTHORIZED_FEED",
+        "ACADEMIC_METADATA",
+        "DATA_SUBJECT_CLAIM"
+      ]
+    },
+    "provenance.source_publication_state": {
+      "name": "source_publication_state",
+      "schema": "provenance",
+      "values": [
+        "PENDING",
+        "APPROVED",
+        "REVOKED"
+      ]
+    },
+    "provenance.source_purpose_compatibility": {
+      "name": "source_purpose_compatibility",
+      "schema": "provenance",
+      "values": [
+        "PENDING",
+        "COMPATIBLE",
+        "INCOMPATIBLE"
+      ]
+    },
+    "provenance.source_reuse_basis": {
+      "name": "source_reuse_basis",
+      "schema": "provenance",
+      "values": [
+        "PENDING",
+        "OPEN_DATA_LICENSE",
+        "WRITTEN_AUTHORIZATION",
+        "OFFICIAL_PUBLICATION_REVIEW",
+        "DATA_SUBJECT_CONSENT"
+      ]
+    },
+    "credentials.temporary_registration_kind": {
+      "name": "temporary_registration_kind",
+      "schema": "credentials",
+      "values": [
+        "NONE",
+        "WITH_CONTRACT",
+        "WITHOUT_CONTRACT"
+      ]
+    }
+  },
+  "schemas": {
+    "catalog": "catalog",
+    "credentials": "credentials",
+    "ingestion_private": "ingestion_private",
+    "provenance": "provenance"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {
+    "provenance.public_evidence_ref": {
+      "columns": {
+        "evidence_id": {
+          "name": "evidence_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "evidence_confidence",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_kind": {
+          "name": "source_kind",
+          "type": "source_kind",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_name": {
+          "name": "source_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_canonical_url": {
+          "name": "source_canonical_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_license_url": {
+          "name": "source_license_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_reuse_basis": {
+          "name": "source_reuse_basis",
+          "type": "source_reuse_basis",
+          "typeSchema": "provenance",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_policy_id": {
+          "name": "source_policy_id",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_valid_until": {
+          "name": "source_valid_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_url": {
+          "name": "canonical_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_cutoff_date": {
+          "name": "source_cutoff_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_until": {
+          "name": "valid_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attribution": {
+          "name": "attribution",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "definition": "\n    select\n      \"provenance\".\"evidence_ref\".\"public_id\" as evidence_id,\n      \"provenance\".\"evidence_ref\".\"confidence\" as confidence,\n      \"provenance\".\"source\".\"source_kind\" as source_kind,\n      \"provenance\".\"source\".\"name\" as source_name,\n      \"provenance\".\"source\".\"canonical_url\" as source_canonical_url,\n      \"provenance\".\"source\".\"license_url\" as source_license_url,\n      \"provenance\".\"source\".\"reuse_basis\" as source_reuse_basis,\n      \"provenance\".\"source\".\"publication_policy_id\" as source_policy_id,\n      \"provenance\".\"source\".\"publication_valid_until\" as source_valid_until,\n      \"provenance\".\"evidence_ref\".\"canonical_url\" as canonical_url,\n      \"provenance\".\"evidence_ref\".\"observed_at\" as observed_at,\n      \"provenance\".\"source_release\".\"cutoff_date\" as source_cutoff_date,\n      \"provenance\".\"evidence_ref\".\"valid_until\" as valid_until,\n      \"provenance\".\"evidence_ref\".\"attribution\" as attribution\n    from \"provenance\".\"evidence_ref\"\n    inner join \"provenance\".\"source_release\"\n      on \"provenance\".\"source_release\".\"id\" = \"provenance\".\"evidence_ref\".\"source_release_id\"\n    inner join \"provenance\".\"source\"\n      on \"provenance\".\"source\".\"id\" = \"provenance\".\"source_release\".\"source_id\"\n    where \"provenance\".\"evidence_ref\".\"publication_state\" = 'APPROVED'\n      and \"provenance\".\"evidence_ref\".\"confidence\" <> 'CANDIDATE'\n      and \"provenance\".\"evidence_ref\".\"observed_at\" <= now()\n      and (\n        \"provenance\".\"evidence_ref\".\"valid_until\" is null\n        or \"provenance\".\"evidence_ref\".\"valid_until\" > now()\n      )\n      and \"provenance\".\"source\".\"publication_state\" = 'APPROVED'\n      and \"provenance\".\"source\".\"purpose_compatibility\" = 'COMPATIBLE'\n      and \"provenance\".\"source\".\"reuse_basis\" <> 'PENDING'\n      and \"provenance\".\"source\".\"publication_reviewed_at\" <= now()\n      and \"provenance\".\"source\".\"publication_valid_until\" > now()\n      and \"provenance\".\"source_release\".\"cutoff_date\" <= current_date\n      and \"provenance\".\"source_release\".\"retrieved_at\" <= now()\n  ",
+      "name": "public_evidence_ref",
+      "schema": "provenance",
+      "isExisting": false,
+      "with": {
+        "securityBarrier": true
+      },
+      "materialized": false
+    },
+    "catalog.public_professional_route": {
+      "columns": {
+        "slug": {
+          "name": "slug",
+          "type": "varchar(180)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "professional_id": {
+          "name": "professional_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_kind": {
+          "name": "route_kind",
+          "type": "professional_route_kind",
+          "typeSchema": "catalog",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "definition": "\n    select\n      \"catalog\".\"professional_route\".\"slug\" as slug,\n      \"public_professional\".\"id\" as professional_id,\n      \"catalog\".\"professional_route\".\"route_kind\" as route_kind\n    from \"catalog\".\"professional_route\"\n    inner join \"catalog\".\"professional\"\n      on \"catalog\".\"professional\".\"id\" = \"catalog\".\"professional_route\".\"professional_id\"\n    inner join \"catalog\".\"public_professional\"\n      on \"public_professional\".\"id\" = \"catalog\".\"professional\".\"public_id\"\n  ",
+      "name": "public_professional_route",
+      "schema": "catalog",
+      "isExisting": false,
+      "with": {
+        "securityBarrier": true
+      },
+      "materialized": false
+    },
+    "catalog.public_professional": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_name": {
+          "name": "normalized_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_name_evidence_id": {
+          "name": "current_name_evidence_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "definition": "\n    select\n      \"catalog\".\"professional\".\"public_id\" as id,\n      \"catalog\".\"professional\".\"display_name\" as display_name,\n      \"catalog\".\"professional\".\"normalized_name\" as normalized_name,\n      evidence.evidence_id as current_name_evidence_id\n    from \"catalog\".\"professional\"\n    inner join provenance.evidence_ref as evidence_ref\n      on evidence_ref.id = \"catalog\".\"professional\".\"current_name_evidence_id\"\n    inner join provenance.public_evidence_ref as evidence\n      on evidence.evidence_id = evidence_ref.public_id\n    inner join provenance.evidence_claim as claim\n      on claim.evidence_id = evidence_ref.id\n      and claim.subject_id = \"catalog\".\"professional\".\"id\"\n      and claim.claim_kind = 'PROFESSIONAL_NAME'\n      and claim.normalized_value = \"catalog\".\"professional\".\"normalized_name\"\n    where \"catalog\".\"professional\".\"visibility\" = 'PUBLIC'\n  ",
+      "name": "public_professional",
+      "schema": "catalog",
+      "isExisting": false,
+      "with": {
+        "securityBarrier": true
+      },
+      "materialized": false
+    },
+    "credentials.public_registered_title": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "professional_id": {
+          "name": "professional_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(250)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_title": {
+          "name": "normalized_title",
+          "type": "varchar(250)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "temporary_registration": {
+          "name": "temporary_registration",
+          "type": "temporary_registration_kind",
+          "typeSchema": "credentials",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_evidence_id": {
+          "name": "current_evidence_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "definition": "\n    select\n      \"credentials\".\"registered_title\".\"public_id\" as id,\n      professional.public_id as professional_id,\n      \"credentials\".\"registered_title\".\"title\" as title,\n      \"credentials\".\"registered_title\".\"normalized_title\" as normalized_title,\n      \"credentials\".\"registered_title\".\"temporary_registration\" as temporary_registration,\n      evidence.evidence_id as current_evidence_id\n    from \"credentials\".\"registered_title\"\n    inner join catalog.professional as professional\n      on professional.id = \"credentials\".\"registered_title\".\"professional_id\"\n    inner join catalog.public_professional as public_professional\n      on public_professional.id = professional.public_id\n    inner join provenance.evidence_ref as evidence_ref\n      on evidence_ref.id = \"credentials\".\"registered_title\".\"current_evidence_id\"\n    inner join provenance.public_evidence_ref as evidence\n      on evidence.evidence_id = evidence_ref.public_id\n      and evidence.confidence in ('DETERMINISTIC', 'HUMAN_VERIFIED')\n      and evidence.source_kind in ('GOVERNMENT_OPEN_DATA', 'OFFICIAL_PUBLICATION')\n    inner join provenance.evidence_claim as claim\n      on claim.evidence_id = evidence_ref.id\n      and claim.subject_id = \"credentials\".\"registered_title\".\"professional_id\"\n      and claim.claim_kind = 'REGISTERED_TITLE'\n      and claim.normalized_value = \"credentials\".\"registered_title\".\"normalized_title\"\n    where \"credentials\".\"registered_title\".\"registration_state\" = 'ENABLED'\n  ",
+      "name": "public_registered_title",
+      "schema": "credentials",
+      "isExisting": false,
+      "with": {
+        "securityBarrier": true
+      },
+      "materialized": false
+    }
+  },
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

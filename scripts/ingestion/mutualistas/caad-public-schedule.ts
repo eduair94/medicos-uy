@@ -4,6 +4,8 @@ import { dirname, resolve } from 'node:path';
 
 import { load } from 'cheerio';
 
+import { configuredDataDirectory } from '../prepare-data-directories';
+
 export const PUBLISHED_CONSULTATION_ROSTER = 'published_consultation_roster' as const;
 export const APPOINTMENT_AVAILABILITY_NOT_OBSERVED = 'not_observed' as const;
 
@@ -593,7 +595,7 @@ function createDefaultOutputDirectory(
   configuration: CaadSourceConfiguration,
   runId: string,
 ): string {
-  return resolve(process.cwd(), 'data', 'raw', 'mutualistas', configuration.slug, runId);
+  return resolve(configuredDataDirectory(), 'raw', 'mutualistas', configuration.slug, runId);
 }
 
 function buildEffectiveOptions(

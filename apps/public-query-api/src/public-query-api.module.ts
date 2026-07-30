@@ -4,6 +4,11 @@ import { CatalogDatabaseModule, CatalogDatabaseReadinessProbe } from '@medicos/d
 import { HealthModule } from '@medicos/health';
 import { ObservabilityModule } from '@medicos/observability';
 import { ProfessionalsModule } from '@medicos/professionals/nest';
+import {
+  OwnerResearchDatabaseModule,
+  OwnerResearchDatabaseReadinessProbe,
+  OwnerResearchModule,
+} from '@medicos/research/nest';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -17,11 +22,12 @@ import { ConfigModule } from '@nestjs/config';
     ObservabilityModule,
     CatalogDatabaseModule,
     HealthModule.register({
-      imports: [CatalogDatabaseModule],
-      probes: [CatalogDatabaseReadinessProbe],
+      imports: [CatalogDatabaseModule, OwnerResearchDatabaseModule],
+      probes: [CatalogDatabaseReadinessProbe, OwnerResearchDatabaseReadinessProbe],
     }),
     ProfessionalsModule,
     CredentialsModule,
+    OwnerResearchModule,
   ],
 })
 export class PublicQueryApiModule {}

@@ -68,6 +68,16 @@ describeWithDocker('DrizzleProfessionalReader', () => {
         nocreaterole
         noreplication
     `);
+    await pool.query(`
+      create role medicos_private_ingestor
+        nologin
+        noinherit
+        nosuperuser
+        nocreatedb
+        nocreaterole
+        noreplication
+        nobypassrls
+    `);
     database = drizzle(pool, {
       casing: 'snake_case',
     });

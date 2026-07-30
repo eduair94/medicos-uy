@@ -29,6 +29,12 @@
       "path": "./packages/modules/professionals/tsconfig.build.json"
     },
     {
+      "path": "./packages/modules/discovery/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/modules/research/tsconfig.build.json"
+    },
+    {
       "path": "./apps/public-query-api/tsconfig.build.json"
     },
     {

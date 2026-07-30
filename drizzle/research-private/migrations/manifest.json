@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "migrations": [
+    {
+      "id": "0006_professional_research",
+      "file": "0006_professional_research.sql",
+      "sha256": "4cdb4eb318fc33dbb02c6ffd259a11190603dca6a420b76cc57625ae4e85a812",
+      "execution": "BASELINE"
+    },
+    {
+      "id": "0007_owner_research_read_model",
+      "file": "0007_owner_research_read_model.sql",
+      "sha256": "d32fd928fdfd60cfda4f910cb6eeee4829906dc8bcdbe66b7a3d1ba6913d847c",
+      "execution": "MANAGED"
+    },
+    {
+      "id": "0008_cmu_ethics_metadata_snapshot",
+      "file": "0008_cmu_ethics_metadata_snapshot.sql",
+      "sha256": "197cd2fac0a36a78984a0d6c4892a191ba6b8e4a0cbbc28eb6194587b05d713c",
+      "execution": "MANAGED"
+    },
+    {
+      "id": "0009_owner_research_keyset_page",
+      "file": "0009_owner_research_keyset_page.sql",
+      "sha256": "c49541f2a1a6dd4be0a0464bfb0a2933311c7334bf28d5914309bd95b651e4b4",
+      "execution": "MANAGED"
+    }
+  ]
+}

@@ -7,6 +7,13 @@ import { CommandApiModule } from '../src/command-api.module';
 
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 
+const ownerApiKeyHeaders = {
+  'x-api-key': 'test-owner-api-key',
+} as const;
+const ownerBasicHeaders = {
+  authorization: `Basic ${Buffer.from('owner:test-owner-api-key', 'utf8').toString('base64')}`,
+} as const;
+
 @Controller({
   path: 'rate-limit-probe',
   version: VERSION_NEUTRAL,
@@ -48,7 +55,7 @@ describe('command API foundation', () => {
     await app.close();
   });
 
-  it('starts without catalog, Firebase or restricted-store credentials', async () => {
+  it('starts with the owner API-key bootstrap and without Firebase credentials', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/health/ready',
@@ -76,11 +83,33 @@ describe('command API foundation', () => {
     expect(secondResponse.statusCode).toBe(200);
   });
 
+  it('protects non-health routes before Nest route resolution', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/private-auth-probe',
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.headers['www-authenticate']).toBeUndefined();
+  });
+
+  it('does not accept HTTP Basic on the command API', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/basic-auth-probe',
+      headers: ownerBasicHeaders,
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.headers['www-authenticate']).toBeUndefined();
+  });
+
   it('returns RFC 9457 status 429 and ignores spoofed forwarding headers', async () => {
     const firstResponse = await app.inject({
       method: 'GET',
       url: '/rate-limit-probe',
       headers: {
+        ...ownerApiKeyHeaders,
         'x-forwarded-for': '203.0.113.10',
       },
     });
@@ -88,6 +117,7 @@ describe('command API foundation', () => {
       method: 'GET',
       url: '/rate-limit-probe',
       headers: {
+        ...ownerApiKeyHeaders,
         'x-forwarded-for': '198.51.100.20',
       },
     });

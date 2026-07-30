@@ -1022,6 +1022,64 @@ async function findLatestMspProfessionalInput(dataDirectory: string): Promise<st
   return selected;
 }
 
+async function findLatestNormalizedNewsArticlesInput(dataDirectory: string): Promise<string> {
+  const root = join(dataDirectory, 'normalized', 'news');
+  const manifestPaths = (await walkFiles(root)).filter(
+    (path) => basename(path) === 'manifest.json',
+  );
+  const candidates = (
+    await Promise.all(
+      manifestPaths.map(async (manifestPath) => {
+        try {
+          const parsed: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
+          if (!isObject(parsed) || typeof parsed['generatedAt'] !== 'string') {
+            return undefined;
+          }
+          const generatedAt = Date.parse(parsed['generatedAt']);
+          const outputs = parsed['outputs'];
+          if (!Number.isFinite(generatedAt) || !isObject(outputs)) {
+            return undefined;
+          }
+          const articles = outputs['articles'];
+          if (!isObject(articles) || typeof articles['relativePath'] !== 'string') {
+            return undefined;
+          }
+          const articlesPath = resolve(dataDirectory, articles['relativePath']);
+          if (
+            articlesPath !== join(dirname(manifestPath), 'articles.ndjson') ||
+            !pathIsInside(root, articlesPath)
+          ) {
+            return undefined;
+          }
+          const metadata = await stat(articlesPath);
+          return metadata.isFile()
+            ? {
+                articlesPath,
+                generatedAt,
+                manifestPath,
+              }
+            : undefined;
+        } catch {
+          return undefined;
+        }
+      }),
+    )
+  )
+    .filter((candidate) => candidate !== undefined)
+    .sort(
+      (left, right) =>
+        right.generatedAt - left.generatedAt ||
+        right.manifestPath.localeCompare(left.manifestPath, 'en'),
+    );
+  const selected = candidates[0];
+  if (selected === undefined) {
+    throw new Error(
+      'No normalized news articles.ndjson found. Run data:ingest:news-indexes or set NEWS_ARTICLES_PATH.',
+    );
+  }
+  return selected.articlesPath;
+}
+
 function serializeNdjson(values: readonly unknown[]): string {
   return values.map((value) => JSON.stringify(value)).join('\n') + (values.length > 0 ? '\n' : '');
 }
@@ -1123,11 +1181,6 @@ export async function runNewsCandidateBuild(
   const dataDirectory = await realpath(resolve(environment['DATA_INGESTION_DIR'] ?? 'data'));
   const professionalConfiguredPath = environment['NEWS_PROFESSIONALS_PATH']?.trim();
   const articleConfiguredPath = environment['NEWS_ARTICLES_PATH']?.trim();
-  if (articleConfiguredPath === undefined || articleConfiguredPath.length === 0) {
-    throw new Error(
-      'NEWS_ARTICLES_PATH is required. Provide a normalized articles.ndjson; this pipeline does not scrape.',
-    );
-  }
 
   const professionalsPath = await resolveExistingPathInside(
     dataDirectory,
@@ -1138,7 +1191,9 @@ export async function runNewsCandidateBuild(
   );
   const articlesPath = await resolveExistingPathInside(
     dataDirectory,
-    articleConfiguredPath,
+    articleConfiguredPath === undefined || articleConfiguredPath.length === 0
+      ? await findLatestNormalizedNewsArticlesInput(dataDirectory)
+      : articleConfiguredPath,
     'Article input',
   );
   const [professionalsContent, articlesContent] = await Promise.all([

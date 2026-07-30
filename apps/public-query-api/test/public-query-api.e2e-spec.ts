@@ -12,12 +12,26 @@ import {
   type ProfessionalSearch,
 } from '@medicos/professionals';
 import { APPROVED_EVIDENCE_FINDER, type ApprovedEvidenceFinder } from '@medicos/provenance';
+import {
+  GetOwnerProfessionalResearch,
+  ListOwnerProfessionalResearch,
+  type OwnerProfessionalResearch,
+  type OwnerProfessionalResearchPage,
+} from '@medicos/research';
 import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { PublicQueryApiModule } from '../src/public-query-api.module';
 
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+
+const OWNER_API_KEY = 'test-owner-api-key';
+const ownerApiKeyHeaders = {
+  'x-api-key': OWNER_API_KEY,
+} as const;
+const ownerBasicHeaders = {
+  authorization: `Basic ${Buffer.from(`owner:${OWNER_API_KEY}`, 'utf8').toString('base64')}`,
+} as const;
 
 const professional = {
   id: '01985bb6-9fd8-75e3-84a7-b9f81fbe7cc8',
@@ -43,6 +57,62 @@ const nameEvidence = {
   validUntil: '2026-08-26T12:00:00.000Z',
   attribution: 'Synthetic contract fixture',
 };
+const ownerResearch = {
+  professionalId: professional.id,
+  slug: professional.slug,
+  analysisVersion: 'professional-research-v1',
+  runStatus: 'COMPLETED',
+  reportId: 'professional_research_v1_e2e',
+  generatedAt: '2026-07-29T12:00:00.000Z',
+  queryAmbiguity: 'NONE',
+  bestFlexibilityIndex: 0,
+  counts: {
+    candidates: 1,
+    officialRegistryRecords: 1,
+    institutionalCandidates: 1,
+    schedules: 1,
+    webCandidates: 0,
+    publicReferenceCandidates: 0,
+    ethicsCandidates: 0,
+  },
+  notice: {
+    associationsAreUnconfirmedCandidates: true,
+    sourceDeclaredSpecialtyIsNotMspCredential: true,
+    publishedScheduleIsNotRealtimeAvailability: true,
+    absenceOfFindingsDoesNotProveAbsence: true,
+    verifyWithOriginalSource: true,
+    text: 'Synthetic owner-only research notice.',
+  },
+  dossier: {
+    schemaVersion: 1,
+    reportId: 'professional_research_v1_e2e',
+    generatedAt: '2026-07-29T12:00:00.000Z',
+    purpose: 'INTERNAL_PROFESSIONAL_RESEARCH',
+    candidates: [],
+  },
+} as unknown as OwnerProfessionalResearch;
+const ownerResearchPage = {
+  items: [
+    {
+      ...ownerResearch,
+      labels: {
+        associationReview: 'UNVERIFIED_REVIEW_CANDIDATE',
+        originalSourceVerificationRequired: true,
+      },
+    },
+  ],
+  pagination: {
+    limit: 10,
+    returned: 1,
+    hasMore: true,
+    nextCursor: 'synthetic-opaque-next-cursor',
+  },
+  labels: {
+    access: 'OWNER_ONLY',
+    associations: 'UNVERIFIED_CANDIDATES_INCLUDED',
+    projection: 'SANITIZED_OWNER_RESEARCH_VIEW',
+  },
+} as const satisfies OwnerProfessionalResearchPage;
 
 describe('public query API', () => {
   let app: NestFastifyApplication;
@@ -78,6 +148,8 @@ describe('public query API', () => {
         evidenceId,
       },
     ]);
+  const getOwnerProfessionalResearch = vi.fn().mockResolvedValue(ownerResearch);
+  const listOwnerProfessionalResearch = vi.fn().mockResolvedValue(ownerResearchPage);
 
   beforeAll(async () => {
     const moduleReference = await Test.createTestingModule({
@@ -99,6 +171,14 @@ describe('public query API', () => {
       .useValue({
         findPublicByProfessionalId: findPublicCredentials,
       } satisfies ProfessionalCredentialsReader)
+      .overrideProvider(GetOwnerProfessionalResearch)
+      .useValue({
+        execute: getOwnerProfessionalResearch,
+      })
+      .overrideProvider(ListOwnerProfessionalResearch)
+      .useValue({
+        execute: listOwnerProfessionalResearch,
+      })
       .overrideProvider(READINESS_PROBES)
       .useValue([
         {
@@ -118,6 +198,9 @@ describe('public query API', () => {
         repositoryUrl: 'https://github.com/example/medicos',
         title: 'Synthetic medical directory',
         version: '1.0.0-test',
+      },
+      ownerAuthentication: {
+        basicEnabled: true,
       },
     });
     await app.init();
@@ -152,10 +235,36 @@ describe('public query API', () => {
     expect(response.body).not.toContain('database unavailable');
   });
 
+  it.each([
+    '/v1/professionals',
+    '/v1/professionals/ana-perez/research',
+    '/v1/owner/research/professionals',
+    '/openapi.json',
+    '/docs',
+    '/.well-known/api-catalog',
+    '/rsd.xml',
+  ])('requires owner authentication for %s', async (url) => {
+    const response = await app.inject({
+      method: 'GET',
+      url,
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(response.headers['www-authenticate']).toContain('Basic realm="Medicos owner API"');
+    expect(response.headers['www-authenticate']).not.toContain('Bearer realm="medicos-owner"');
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.json()).toMatchObject({
+      status: 401,
+      detail: 'Owner authentication is required.',
+    });
+  });
+
   it('lists only the public DTO fields', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/professionals?q=Ana&limit=10',
+      headers: ownerApiKeyHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -172,6 +281,7 @@ describe('public query API', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/professionals/ana-perez',
+      headers: ownerApiKeyHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -186,6 +296,7 @@ describe('public query API', () => {
     const response = await app.inject({
       method: 'GET',
       url: `/v1/professionals/${professional.id}/credentials`,
+      headers: ownerApiKeyHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -204,10 +315,79 @@ describe('public query API', () => {
     expect(findPublicCredentials).toHaveBeenCalledWith(professional.id);
   });
 
+  it('returns the owner research dossier through an authenticated request', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/professionals/${professional.id}/research`,
+      headers: ownerApiKeyHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.json()).toMatchObject({
+      professionalId: professional.id,
+      counts: {
+        institutionalCandidates: 1,
+        schedules: 1,
+      },
+      notice: {
+        associationsAreUnconfirmedCandidates: true,
+      },
+      dossier: {
+        reportId: 'professional_research_v1_e2e',
+      },
+    });
+    expect(getOwnerProfessionalResearch).toHaveBeenCalledWith(professional.id);
+  });
+
+  it('lists complete sanitized research dossiers with unverified review labels', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/owner/research/professionals?limit=10&cursor=synthetic-current-cursor',
+      headers: ownerApiKeyHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.json()).toMatchObject({
+      items: [
+        {
+          professionalId: professional.id,
+          labels: {
+            associationReview: 'UNVERIFIED_REVIEW_CANDIDATE',
+            originalSourceVerificationRequired: true,
+          },
+          notice: {
+            associationsAreUnconfirmedCandidates: true,
+          },
+          dossier: {
+            reportId: 'professional_research_v1_e2e',
+          },
+        },
+      ],
+      pagination: {
+        limit: 10,
+        returned: 1,
+        hasMore: true,
+        nextCursor: 'synthetic-opaque-next-cursor',
+      },
+      labels: {
+        access: 'OWNER_ONLY',
+        associations: 'UNVERIFIED_CANDIDATES_INCLUDED',
+        projection: 'SANITIZED_OWNER_RESEARCH_VIEW',
+      },
+    });
+    expect(listOwnerProfessionalResearch).toHaveBeenCalledWith({
+      cursor: 'synthetic-current-cursor',
+      limit: 10,
+    });
+  });
+
   it('returns RFC 9457 problem details for an unknown professional', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/professionals/missing',
+      headers: ownerApiKeyHeaders,
     });
 
     expect(response.statusCode).toBe(404);
@@ -231,6 +411,7 @@ describe('public query API', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/professionals?unexpected=true',
+      headers: ownerApiKeyHeaders,
     });
 
     expect(response.statusCode).toBe(400);
@@ -241,16 +422,18 @@ describe('public query API', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/professionals?cursor=invalid',
+      headers: ownerApiKeyHeaders,
     });
 
     expect(response.statusCode).toBe(400);
     expect(response.body).not.toContain('stack');
   });
 
-  it('publishes a deterministic OpenAPI contract without fake authentication', async () => {
+  it('publishes a deterministic owner-authenticated OpenAPI contract', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/openapi.json',
+      headers: ownerApiKeyHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -264,12 +447,14 @@ describe('public query API', () => {
             readonly operationId?: string;
             readonly parameters?: readonly { readonly name: string }[];
             readonly responses?: Record<string, { readonly content?: Record<string, unknown> }>;
+            readonly security?: readonly Record<string, readonly string[]>[];
           };
         }
       >;
       readonly components?: {
         readonly securitySchemes?: Record<string, unknown>;
       };
+      readonly security?: readonly Record<string, readonly string[]>[];
       readonly servers?: readonly { readonly url: string }[];
     }>();
 
@@ -278,8 +463,10 @@ describe('public query API', () => {
       [
         '/health/live',
         '/health/ready',
+        '/v1/owner/research/professionals',
         '/v1/professionals',
         '/v1/professionals/{idOrSlug}',
+        '/v1/professionals/{idOrSlug}/research',
         '/v1/professionals/{professionalId}/credentials',
       ].sort(),
     );
@@ -290,9 +477,47 @@ describe('public query API', () => {
     expect(document.paths['/v1/professionals']?.get?.responses?.['400']?.content).toHaveProperty(
       'application/problem+json',
     );
-    expect(document.components?.securitySchemes).toBeUndefined();
+    expect(document.paths['/v1/owner/research/professionals']?.get?.operationId).toBe(
+      'listOwnerProfessionalResearch',
+    );
+    expect(
+      document.paths['/v1/owner/research/professionals']?.get?.parameters?.map(
+        (parameter) => parameter.name,
+      ),
+    ).toEqual(['limit', 'cursor']);
+    expect(
+      document.paths['/v1/owner/research/professionals']?.get?.responses?.['400']?.content,
+    ).toHaveProperty('application/problem+json');
+    expect(document.components?.securitySchemes).toEqual({
+      ownerBasic: {
+        type: 'http',
+        scheme: 'basic',
+        description:
+          'Acceso owner para navegador. Usa el usuario configurado y la misma clave privada que X-API-Key.',
+      },
+      ownerApiKey: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-API-Key',
+        description: 'Clave owner privada; el servidor conserva solamente su SHA-256.',
+      },
+    });
+    expect(document.security).toEqual([{ ownerBasic: [] }, { ownerApiKey: [] }]);
+    expect(document.paths['/health/live']?.get?.security).toEqual([]);
+    expect(document.paths['/health/ready']?.get?.security).toEqual([]);
+    expect(document.paths['/health/live']?.get?.responses?.['401']).toBeUndefined();
+    expect(document.paths['/health/ready']?.get?.responses?.['401']).toBeUndefined();
+
+    for (const [path, pathItem] of Object.entries(document.paths)) {
+      if (path === '/health/live' || path === '/health/ready') {
+        continue;
+      }
+
+      expect(pathItem.get?.responses?.['401']?.content).toHaveProperty('application/problem+json');
+    }
+    expect(response.headers['cache-control']).toBe('private, no-store');
     expect(document.servers).toEqual([
-      { url: 'https://api.example.test', description: 'Servidor público configurado' },
+      { url: 'https://api.example.test', description: 'Servidor privado configurado' },
     ]);
   });
 
@@ -300,6 +525,7 @@ describe('public query API', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/docs',
+      headers: ownerBasicHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -307,20 +533,24 @@ describe('public query API', () => {
     expect(response.body).toContain('@scalar/api-reference@1.63.0');
     expect(response.body).toContain('/openapi.json');
     expect(response.headers['content-security-policy']).toContain('https://cdn.jsdelivr.net');
+    expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
   it('supports modern API discovery and backwards-compatible RSD', async () => {
     const catalog = await app.inject({
       method: 'GET',
       url: '/.well-known/api-catalog',
+      headers: ownerApiKeyHeaders,
     });
     const catalogHead = await app.inject({
       method: 'HEAD',
       url: '/.well-known/api-catalog',
+      headers: ownerApiKeyHeaders,
     });
     const rsd = await app.inject({
       method: 'GET',
       url: '/rsd.xml',
+      headers: ownerApiKeyHeaders,
     });
 
     expect(catalog.statusCode).toBe(200);

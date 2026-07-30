@@ -1,0 +1,7 @@
+# Deterministic test/example values introduced in fb9f710. None is a production
+# credential; current source lines are also marked with gitleaks:allow.
+fb9f710d8bd15548347dcc54a1288a5af397a354:.env.example:generic-api-key:10
+fb9f710d8bd15548347dcc54a1288a5af397a354:scripts/openapi/generate-public-openapi.ts:generic-api-key:31
+fb9f710d8bd15548347dcc54a1288a5af397a354:README.md:curl-auth-user:158
+fb9f710d8bd15548347dcc54a1288a5af397a354:README.md:curl-auth-header:158
+fb9f710d8bd15548347dcc54a1288a5af397a354:packages/platform/config/test/environment.spec.ts:generic-api-key:12

@@ -8,6 +8,7 @@ const workspaceAliases = {
   '@medicos/credentials/nest': resolve(__dirname, 'packages/modules/credentials/src/nest.ts'),
   '@medicos/credentials': resolve(__dirname, 'packages/modules/credentials/src/index.ts'),
   '@medicos/database': resolve(__dirname, 'packages/platform/database/src/index.ts'),
+  '@medicos/discovery': resolve(__dirname, 'packages/modules/discovery/src/index.ts'),
   '@medicos/health': resolve(__dirname, 'packages/platform/health/src/index.ts'),
   '@medicos/http': resolve(__dirname, 'packages/platform/http/src/index.ts'),
   '@medicos/observability': resolve(__dirname, 'packages/platform/observability/src/index.ts'),
@@ -15,6 +16,8 @@ const workspaceAliases = {
   '@medicos/professionals': resolve(__dirname, 'packages/modules/professionals/src/index.ts'),
   '@medicos/provenance/nest': resolve(__dirname, 'packages/modules/provenance/src/nest.ts'),
   '@medicos/provenance': resolve(__dirname, 'packages/modules/provenance/src/index.ts'),
+  '@medicos/research/nest': resolve(__dirname, 'packages/modules/research/src/nest.ts'),
+  '@medicos/research': resolve(__dirname, 'packages/modules/research/src/index.ts'),
   '@medicos/worker': resolve(__dirname, 'packages/platform/worker/src/index.ts'),
 };
 
