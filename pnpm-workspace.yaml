@@ -33,7 +33,7 @@ catalog:
   '@swc/core': 1.15.46
   '@testcontainers/postgresql': 12.0.4
   '@types/node': 24.13.3
-  '@types/pg': 8.20.0
+  '@types/pg': 8.20.2
   '@vitest/coverage-v8': 4.1.10
   '@vitest/eslint-plugin': 1.6.24
   class-transformer: 0.5.1
