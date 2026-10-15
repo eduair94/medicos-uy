@@ -142,8 +142,8 @@ catalogs:
       specifier: 1.5.9
       version: 1.5.9
     uuid:
-      specifier: 11.1.1
-      version: 11.1.1
+      specifier: 14.0.1
+      version: 14.0.1
     vite:
       specifier: 8.1.5
       version: 8.1.5
@@ -259,7 +259,7 @@ importers:
         version: 1.5.9(@swc/core@1.15.46)
       uuid:
         specifier: 'catalog:'
-        version: 11.1.1
+        version: 14.0.1
       vite:
         specifier: 'catalog:'
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(tsx@4.23.1)(yaml@2.9.0)
@@ -3241,8 +3241,8 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
-  uuid@11.1.1:
-    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
+  uuid@14.0.1:
+    resolution: {integrity: sha512-6ZxzVpzDXDa3bJWaHilVayA+BH/1zmxCJoVgvmqJnid/gPoKHxUrS/aC/T6LGQtNHT+XHG9fXPJB4d+IrU30Ew==}
     hasBin: true
 
   validator@13.15.35:
@@ -5898,7 +5898,7 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  uuid@11.1.1: {}
+  uuid@14.0.1: {}
 
   validator@13.15.35: {}
 
